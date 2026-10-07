@@ -1,0 +1,1499 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f17">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Coach">
+<meta name="robots" content="noindex">
+<title>Home Coach</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0f17'/%3E%3Ccircle cx='32' cy='32' r='20' fill='none' stroke='%235eead4' stroke-width='7'/%3E%3Cpath d='M27 22l14 10-14 10z' fill='%235eead4'/%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #0b0f17; --surface: #141a26; --surface2: #1b2333; --line: #263046;
+  --text: #eef2f8; --muted: #8e9ab0;
+  --accent: #5eead4; --warm: #fbbf24; --cool: #60a5fa; --soft: #a78bfa; --go: #a3e635;
+  --phase: var(--accent);
+  --fig: #e6ecf5;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; background: var(--bg); color: var(--text); }
+body {
+  font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased; overscroll-behavior: none;
+}
+button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
+[hidden] { display: none !important; }
+#app { max-width: 520px; margin: 0 auto; min-height: 100vh; min-height: 100dvh; }
+.screen {
+  display: flex; flex-direction: column; gap: 14px;
+  padding: calc(env(safe-area-inset-top) + 14px) 18px calc(env(safe-area-inset-bottom) + 18px);
+  min-height: 100vh; min-height: 100dvh;
+}
+.muted { color: var(--muted); }
+.small { font-size: 14px; }
+.center { text-align: center; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 14px 16px; }
+h1, h2, h3 { margin: 0; line-height: 1.15; }
+
+/* Home */
+.brand { display: flex; align-items: center; gap: 12px; padding-top: 4px; }
+.logo { width: 40px; height: 40px; border-radius: 12px; background: radial-gradient(circle at 50% 50%, transparent 9px, var(--accent) 10px, var(--accent) 14px, transparent 15px), var(--surface2); }
+.brand-name { font-weight: 700; font-size: 19px; }
+.brand-sub { color: var(--muted); font-size: 14px; }
+.picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.pick {
+  background: var(--surface); border: 1.5px solid var(--line); border-radius: 14px;
+  padding: 12px 8px; min-height: 64px; text-align: center; font-weight: 600; font-size: 15px; line-height: 1.2;
+}
+.pick small { display: block; color: var(--muted); font-weight: 500; font-size: 12px; margin-top: 3px; }
+.pick[aria-pressed="true"] { border-color: var(--accent); background: #10302d; }
+.ov-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.ov-head h1 { font-size: 24px; }
+.ov-head p { margin: 4px 0 0; }
+.ov-total { background: var(--surface2); border-radius: 12px; padding: 6px 10px; font-weight: 700; white-space: nowrap; color: var(--accent); }
+.week { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.week-label { font-weight: 600; }
+.week-val { font-size: 22px; font-weight: 800; min-width: 28px; text-align: center; }
+.week-hold { font-size: 14px; }
+.ov-list { list-style: none; margin: 12px 0 0; padding: 0; }
+.ov-list li { display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+.ov-list li:first-child { border-top: 0; }
+.ov-list .t { font-weight: 600; }
+.ov-list .d { color: var(--muted); font-size: 14px; }
+.ov-list .s { color: var(--muted); font-size: 14px; white-space: nowrap; }
+.ov-list .opt { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--soft); margin-left: 6px; }
+.ov-list .sec { color: var(--accent); font-size: 12px; text-transform: uppercase; letter-spacing: .07em; font-weight: 700; padding: 14px 0 0; border: 0; }
+.tip { margin: 0; padding: 10px 12px; border-radius: 12px; background: #13202a; border: 1px solid #1f3442; color: #b9d7e8; font-size: 14px; }
+.toggles { display: flex; gap: 10px; }
+.switch { flex: 1; display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; min-height: 52px; font-weight: 600; font-size: 15px; }
+.switch input { position: absolute; opacity: 0; pointer-events: none; }
+.slider { width: 42px; height: 26px; border-radius: 13px; background: #2b3448; position: relative; flex: none; transition: background .2s; }
+.slider::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #cfd6e3; transition: transform .2s; }
+.switch input:checked + .slider { background: var(--accent); }
+.switch input:checked + .slider::after { transform: translateX(16px); background: #062823; }
+.switch input:focus-visible + .slider { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cta {
+  display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%;
+  min-height: 68px; border: 0; border-radius: 20px; background: var(--accent); color: #04211d;
+  font-size: 22px; font-weight: 800; box-shadow: 0 10px 30px -10px rgba(94, 234, 212, .55);
+}
+.cta svg { width: 28px; height: 28px; fill: currentColor; }
+.cta:active { transform: scale(.98); }
+.link-btn { background: none; border: 0; color: var(--muted); text-decoration: underline; padding: 6px; min-height: 44px; }
+.ghost { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 10px 16px; min-height: 48px; font-weight: 600; }
+.ghost.wide { width: 100%; }
+.last-head { display: flex; justify-content: space-between; gap: 8px; }
+pre { white-space: pre-wrap; word-break: break-word; font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; color: #c9d3e3; background: #0e131d; border-radius: 10px; padding: 10px; margin: 10px 0; }
+.foot { font-size: 13px; text-align: center; margin: 0; }
+
+/* Player */
+#player { gap: clamp(4px, 1.1dvh, 12px); padding-bottom: calc(env(safe-area-inset-bottom) + 12px); }
+.topbar { display: flex; align-items: center; gap: 6px; }
+.top-title { flex: 1; min-width: 0; font-weight: 700; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.icon-btn { width: 44px; height: 44px; flex: none; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; padding: 0; font-size: 20px; }
+.icon-btn svg { width: 24px; height: 24px; }
+.icon-btn.small { width: 44px; height: 44px; font-size: 22px; }
+.tog.off { opacity: .45; }
+.tog svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.progress .bar { height: 8px; border-radius: 4px; background: var(--surface2); overflow: hidden; }
+.progress .fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), #7dd3fc); border-radius: 4px; transition: width .3s linear; }
+.progress-meta { display: flex; justify-content: space-between; color: var(--muted); font-size: 14px; margin-top: 5px; font-variant-numeric: tabular-nums; }
+.now { text-align: center; }
+.section-name { color: var(--accent); font-size: 13px; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; min-height: 18px; }
+.ex-name { font-size: clamp(21px, min(7vw, 3.7dvh), 32px); font-weight: 800; margin-top: 2px; }
+.ex-meta { font-size: clamp(15px, 2.2dvh, 18px); color: #c8d2e2; font-weight: 600; margin-top: 4px; font-variant-numeric: tabular-nums; min-height: 25px; }
+.stage { position: relative; align-self: center; flex: none; width: min(66vw, 27vh, 290px); width: min(66vw, 27dvh, 290px); aspect-ratio: 1 / 1; display: grid; place-items: center; }
+.stage svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.stage.fig { aspect-ratio: 10 / 7; width: min(80vw, 31vh, 340px); width: min(80vw, 31dvh, 340px); }
+.clock { text-align: center; font-size: clamp(48px, min(22vw, 10dvh), 104px); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; color: var(--phase); letter-spacing: -.02em; transition: color .25s; }
+.clock.target { font-size: clamp(44px, min(17vw, 8.5dvh), 88px); }
+.phase { text-align: center; font-size: clamp(18px, 2.7dvh, 22px); font-weight: 700; min-height: 30px; color: var(--phase); transition: color .25s; }
+.instr { text-align: center; color: #c3cddc; margin: 0; font-size: clamp(14px, 2dvh, 16px); min-height: 22px; padding: 0 4px; }
+.reps-panel { display: flex; gap: 10px; align-items: stretch; }
+.reps-input { flex: 0 0 42%; display: flex; flex-direction: column; justify-content: center; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 6px 12px; }
+.reps-input span { font-size: 13px; color: var(--muted); font-weight: 600; }
+.reps-input em { font-style: normal; opacity: .8; }
+.reps-input input { width: 100%; background: transparent; border: 0; color: var(--text); font-size: 30px; font-weight: 800; padding: 2px 0; outline: none; font-variant-numeric: tabular-nums; }
+.done-btn { flex: 1; min-height: clamp(60px, 8.5dvh, 76px); border: 0; border-radius: 18px; background: var(--go); color: #172505; font-size: 26px; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 10px 30px -12px rgba(163, 230, 53, .6); }
+.done-btn svg { width: 30px; height: 30px; }
+.done-btn:active { transform: scale(.98); }
+.skip-group { min-height: 52px; border-radius: 14px; border: 1.5px dashed var(--soft); background: #1b1630; color: #d6ccff; font-weight: 700; font-size: 17px; }
+.next { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-radius: 14px; }
+.next-label { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 700; flex: none; }
+.next-val { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.controls { display: flex; justify-content: center; align-items: center; gap: 22px; margin-top: auto; }
+.ctl { width: clamp(54px, 7.6dvh, 68px); height: clamp(54px, 7.6dvh, 68px); border-radius: 50%; border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; padding: 0; }
+.ctl svg { width: 28px; height: 28px; fill: currentColor; }
+.ctl.play { width: clamp(70px, 10.4dvh, 92px); height: clamp(70px, 10.4dvh, 92px); background: var(--accent); color: #04211d; border: 0; box-shadow: 0 10px 30px -10px rgba(94, 234, 212, .6); }
+.ctl.play svg { width: 40px; height: 40px; }
+.ctl:active { transform: scale(.96); }
+.row2 { display: flex; justify-content: center; }
+.row2 .ghost { min-height: 44px; padding: 8px 14px; font-size: 15px; color: var(--muted); }
+#player .tip { text-align: center; font-size: 13px; padding: 6px 10px; }
+
+/* cue animations */
+.cue-track { fill: none; stroke: var(--surface2); stroke-width: 14; }
+.cue-ring { fill: none; stroke: var(--phase); stroke-width: 14; stroke-linecap: round; transition: stroke .25s; }
+#cueSvg.glow .cue-ring { filter: drop-shadow(0 0 8px var(--warm)); }
+.cue-text { fill: var(--text); font-weight: 700; font-size: 17px; text-anchor: middle; dominant-baseline: middle; }
+.cue-sub { fill: var(--muted); font-size: 12px; font-weight: 600; text-anchor: middle; letter-spacing: .08em; }
+.breath-guide { fill: none; stroke: #23314a; stroke-width: 2; stroke-dasharray: 4 6; }
+.breath-core { fill: url(#gBreath); }
+.pulse-core { fill: var(--phase); }
+.ripple-ring { fill: none; stroke: var(--soft); stroke-width: 3; }
+.ripple-core { fill: #2a2350; stroke: var(--soft); stroke-width: 2; }
+.eye-white { fill: #e7edf7; }
+.eye-iris { fill: #2563eb; }
+.eye-pupil { fill: #0b0f17; }
+.horizon { fill: none; stroke: #3b4a66; stroke-width: 2.5; stroke-linejoin: round; }
+.fig-ground { stroke: #2b3550; stroke-width: 3; stroke-linecap: round; }
+.fig-limb { fill: none; stroke: var(--fig); stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
+.fig-limb.far { opacity: .42; }
+.fig-head { fill: var(--fig); }
+.fig-prop path { fill: none; stroke: #5b6a88; stroke-width: 4; stroke-linecap: round; }
+.fig-prop rect { fill: #7c8db0; }
+
+/* Done */
+.done-hero { text-align: center; padding: 20px 0 6px; }
+.done-check { width: 84px; height: 84px; margin: 0 auto 14px; border-radius: 50%; background: #10302d; color: var(--accent); display: grid; place-items: center; }
+.done-check svg { width: 46px; height: 46px; }
+.done-hero h1 { font-size: 28px; }
+.log-round { margin-top: 12px; }
+.log-round h4 { margin: 0 0 6px; color: var(--accent); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.log-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); }
+.log-row input { width: 84px; background: var(--surface2); border: 1px solid var(--line); border-radius: 10px; color: var(--text); font-size: 18px; font-weight: 700; padding: 8px 10px; text-align: right; }
+.log-row .unit { color: var(--muted); font-size: 13px; margin-left: 6px; display: inline-block; width: 30px; }
+
+@media (prefers-reduced-motion: reduce) { .progress .fill { transition: none; } }
+@media (max-height: 740px) {
+  .stage { width: min(58vw, 23vh); width: min(58vw, 23dvh); }
+  .stage.fig { width: min(70vw, 27vh); width: min(70vw, 27dvh); }
+  .ov-head h1 { font-size: 22px; }
+}
+@media (max-height: 640px) {
+  #player .instr { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+  #player .section-name { display: none; }
+}
+</style>
+</head>
+<body>
+<main id="app">
+
+  <!-- HOME / OVERVIEW -->
+  <section id="home" class="screen">
+    <header class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <div>
+        <div class="brand-name">Home Coach</div>
+        <div class="brand-sub">Guided sessions, hands-free</div>
+      </div>
+    </header>
+
+    <nav class="picker" id="picker" aria-label="Choose a session"></nav>
+
+    <div class="overview card">
+      <div class="ov-head">
+        <div>
+          <h1 id="ovTitle">Session</h1>
+          <p class="muted" id="ovSub"></p>
+        </div>
+        <div class="ov-total" id="ovTotal"></div>
+      </div>
+      <div class="week" id="weekRow" hidden>
+        <span class="week-label">Week</span>
+        <button class="icon-btn small" id="weekMinus" aria-label="Previous week">−</button>
+        <span class="week-val" id="weekVal">1</span>
+        <button class="icon-btn small" id="weekPlus" aria-label="Next week">+</button>
+        <span class="muted week-hold" id="weekHold"></span>
+      </div>
+      <ol class="ov-list" id="ovList"></ol>
+      <p class="tip" id="ovTip" hidden></p>
+    </div>
+
+    <div class="toggles">
+      <label class="switch"><input type="checkbox" id="optSound"><span class="slider"></span><span>Sound cues</span></label>
+      <label class="switch"><input type="checkbox" id="optVoice"><span class="slider"></span><span>Voice cues</span></label>
+    </div>
+
+    <button class="cta" id="btnStart"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg><span id="btnStartLabel">Play</span></button>
+    <button class="link-btn" id="btnStartOver" hidden>Start over from the beginning</button>
+
+    <div class="card last" id="lastBox" hidden>
+      <div class="last-head"><strong>Last logged workout</strong><span class="muted" id="lastDate"></span></div>
+      <pre id="lastText"></pre>
+      <button class="ghost" id="btnCopyLast">Copy summary</button>
+    </div>
+    <p class="foot muted">Tip: turn your volume up. The screen stays awake while a session plays (where supported).</p>
+  </section>
+
+  <!-- PLAYER -->
+  <section id="player" class="screen" hidden>
+    <header class="topbar">
+      <button class="icon-btn" id="btnHome" aria-label="Back to overview"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <div class="top-title" id="pTitle"></div>
+      <button class="icon-btn tog" id="btnRestart" aria-label="Restart session" title="Restart session"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.6-5.9"/><path d="M4 4v5h5"/></svg></button>
+      <button class="icon-btn tog" id="pSound" aria-label="Toggle sound"></button>
+      <button class="icon-btn tog" id="pVoice" aria-label="Toggle voice"></button>
+    </header>
+
+    <div class="progress">
+      <div class="bar"><div class="fill" id="pBar"></div></div>
+      <div class="progress-meta"><span id="pCount"></span><span id="pEta"></span></div>
+    </div>
+
+    <div class="now">
+      <div class="section-name" id="pSection"></div>
+      <h2 class="ex-name" id="pName"></h2>
+      <div class="ex-meta" id="pMeta"></div>
+    </div>
+
+    <div class="stage" id="stage">
+      <svg id="cueSvg" viewBox="0 0 200 200" aria-hidden="true"></svg>
+      <svg id="figSvg" viewBox="0 0 200 140" aria-hidden="true"></svg>
+    </div>
+
+    <div class="clock" id="pClock">0</div>
+    <div class="phase" id="pPhase"></div>
+    <p class="instr" id="pInstr"></p>
+
+    <div class="reps-panel" id="repsPanel" hidden>
+      <label class="reps-input"><span>Reps done <em>(optional)</em></span>
+        <input type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="999" id="repsInput" placeholder="–"></label>
+      <button class="done-btn" id="btnDone">Done <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </div>
+
+    <button class="skip-group" id="btnSkipGroup" hidden></button>
+
+    <div class="next card"><span class="next-label">Up next</span><span class="next-val" id="pNext"></span></div>
+
+    <div class="controls">
+      <button class="ctl" id="btnBack" aria-label="Previous step"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+      <button class="ctl play" id="btnPlay" aria-label="Play or pause"><svg viewBox="0 0 24 24" id="playIcon"><path d="M8 5v14l11-7z"/></svg></button>
+      <button class="ctl" id="btnFwd" aria-label="Next step"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
+    </div>
+    <p class="tip" id="pTip" hidden></p>
+  </section>
+
+  <!-- DONE -->
+  <section id="done" class="screen" hidden>
+    <div class="done-hero">
+      <div class="done-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <h1>Session complete</h1>
+      <p class="muted" id="dTime"></p>
+    </div>
+    <div class="card" id="dLogBox" hidden>
+      <h3>Your log</h3>
+      <p class="muted small">Edit any number before copying.</p>
+      <div id="dLog"></div>
+      <pre id="dText"></pre>
+      <button class="cta" id="btnCopy">Copy summary</button>
+      <p class="muted small center" id="copyMsg" aria-live="polite"></p>
+    </div>
+    <button class="ghost wide" id="btnAgain">Back to sessions</button>
+  </section>
+</main>
+<script>
+/*
+ * Session definitions. Edit this file to change the routines.
+ *
+ * Block types (expanded into player steps by app.js):
+ *   breathing : { name, seconds, inhale, exhale, instruction }
+ *   holds     : { name, sets, reps, hold, relax, restBetweenSets, anim: 'ring'|'pulse'|'ripple',
+ *                 squeezeLabel, relaxLabel, squeezeSay, relaxSay, perRepVoice, instruction }
+ *               hold/relax may be 'week' to use the session's holdByWeek table (?w= URL param).
+ *   stretch   : { name, perSide, figure, optional, instruction }   (left side, switch, right side)
+ *   timed     : { name, seconds, figure | anim, instruction, cues: [{ at, say }] }
+ *   circuit   : { rounds, restBetweenExercises, restBetweenRounds, exercises: [
+ *                 { name, reps: '15–20', est, figure, instruction }      -> rep-based, tap Done
+ *                 { name, seconds, figure, log: 'time', instruction } ] } -> timed
+ *   interval  : { rounds, work, transition, setup: { seconds, label }, exercises: [{ name, figure, side, instruction }] }
+ *
+ * Common optional block fields: section (group heading), optional (group name; adds a Skip button).
+ * Figures available: march, armcircles, squat, pushup, row, pike, bridge, plank, crunch, kneetuck,
+ *   legraise, sidecrunch, neckroll, shoulderroll, chestopener, hamstring, calfraise, lunge, glute.
+ */
+window.COACH_SESSIONS = {
+  pelvic: {
+    title: 'Core & pelvic floor',
+    short: 'Pelvic floor',
+    subtitle: 'Evening routine · optional stretches at the end',
+    tip: 'Breathe normally. Keep stomach, glutes and thighs relaxed.',
+    usesWeek: true,
+    // Week param (?w=) controls slow-hold timing.
+    holdByWeek: [
+      { maxWeek: 2, hold: 5, relax: 5 },
+      { maxWeek: 4, hold: 8, relax: 8 },
+      { maxWeek: Infinity, hold: 10, relax: 10 },
+    ],
+    blocks: [
+      {
+        type: 'breathing', name: 'Belly breathing', seconds: 60, inhale: 4, exhale: 6,
+        instruction: 'Let the pelvic floor soften and drop as you breathe in.',
+      },
+      {
+        type: 'holds', name: 'Slow holds', sets: 3, reps: 10, hold: 'week', relax: 'week',
+        restBetweenSets: 30, anim: 'ring',
+        squeezeLabel: 'Squeeze & hold', relaxLabel: 'Relax fully',
+        squeezeSay: 'Squeeze... hold', relaxSay: 'and relax',
+        instruction: 'Lift and squeeze gently, hold, then let go completely.',
+      },
+      {
+        type: 'holds', name: 'Quick flicks', sets: 2, reps: 15, hold: 1, relax: 1,
+        restBetweenSets: 20, anim: 'pulse', perRepVoice: false,
+        squeezeLabel: 'Flick', relaxLabel: 'Release',
+        introSay: 'Quick flicks. Squeeze and release with each beep.',
+        instruction: 'Quick squeeze, then let go straight away. About one per second.',
+      },
+      {
+        type: 'holds', name: 'Reverse kegels', sets: 1, reps: 10, hold: 5, relax: 5,
+        restBetweenSets: 0, anim: 'ripple',
+        squeezeLabel: 'Release & lengthen', relaxLabel: 'Rest',
+        squeezeSay: 'Gently release', relaxSay: 'Rest',
+        introSay: "Reverse kegels. Gently, don't push hard.",
+        instruction: "Gently relax and lengthen outward. Gently, don't push hard.",
+      },
+      {
+        type: 'stretch', name: 'Lunge hip-flexor stretch', perSide: 30, figure: 'lunge',
+        optional: 'Optional hip stretches',
+        instruction: 'Half-kneel in a lunge, tuck the pelvis slightly and ease the hips forward.',
+      },
+      {
+        type: 'stretch', name: 'Deep glute stretch', perSide: 30, figure: 'glute',
+        optional: 'Optional hip stretches',
+        instruction: 'On your back, cross one ankle over the other knee and draw the legs in.',
+      },
+    ],
+  },
+
+  workout: {
+    title: 'Home full-body',
+    short: 'Full-body',
+    subtitle: 'Week 1 · bodyweight + a backpack',
+    logReps: true,
+    readySeconds: 3,
+    blocks: [
+      { type: 'timed', section: 'Warm-up', name: 'March in place', seconds: 60, figure: 'march',
+        instruction: 'Lift the knees, swing the arms, breathe easy.' },
+      { type: 'timed', section: 'Warm-up', name: 'Arm circles', seconds: 60, figure: 'armcircles',
+        instruction: 'Small circles growing bigger. Switch direction halfway.',
+        cues: [{ at: 30, say: 'Switch direction' }] },
+      { type: 'timed', section: 'Warm-up', name: 'Slow bodyweight squats', seconds: 60, figure: 'squat',
+        instruction: 'Slow and controlled. Chest up, knees over toes.' },
+      {
+        type: 'circuit', section: 'Circuit', rounds: 3, restBetweenExercises: 20, restBetweenRounds: 90,
+        exercises: [
+          { name: 'Push-ups', reps: '8–12', est: 40, figure: 'pushup',
+            instruction: 'Straight line from head to heels. Drop to the knees if needed.' },
+          { name: 'Squats', reps: '15–20', est: 50, figure: 'squat',
+            instruction: 'Sit back and down, chest up, drive up through the heels.' },
+          { name: 'Backpack rows', reps: '10–12', est: 40, figure: 'row',
+            instruction: 'Hinge forward with a flat back and pull the bag to your ribs.' },
+          { name: 'Pike push-ups', reps: '6–10', est: 35, figure: 'pike',
+            instruction: 'Hips high, bend the elbows and lower your head toward the floor.' },
+          { name: 'Glute bridges', reps: '15', est: 40, figure: 'bridge',
+            instruction: 'Drive through the heels, squeeze the glutes at the top.' },
+          { name: 'Plank', seconds: 30, figure: 'plank', log: 'time',
+            instruction: 'Forearms down, body in one straight line, brace the core.' },
+        ],
+      },
+      {
+        type: 'interval', section: 'Chair core finisher', rounds: 2, work: 30, transition: 10,
+        setup: { seconds: 20, label: 'Grab a sturdy chair' },
+        exercises: [
+          { name: 'Chair-supported crunch', figure: 'crunch',
+            instruction: 'Lie back with calves on the seat. Curl the shoulders up, then lower.' },
+          { name: 'Seated knee tucks', figure: 'kneetuck',
+            instruction: 'Sit on the front edge, hold the seat, draw the knees in and extend.' },
+          { name: 'Seated leg raises', figure: 'legraise',
+            instruction: 'Lean back slightly, legs straight, lift and lower with control.' },
+          { name: 'Side crunch (left)', figure: 'sidecrunch', side: 'left',
+            instruction: 'Hands by your head, crunch down to the left side.' },
+          { name: 'Side crunch (right)', figure: 'sidecrunch', side: 'right',
+            instruction: 'Hands by your head, crunch down to the right side.' },
+        ],
+      },
+    ],
+  },
+
+  breaks: {
+    title: 'Desk reset',
+    short: 'Desk reset',
+    subtitle: 'Quick 3-minute break',
+    readySeconds: 3,
+    blocks: [
+      { type: 'timed', name: 'Neck rolls', seconds: 30, figure: 'neckroll',
+        instruction: 'Slow half-circles, ear toward shoulder. Never force it.' },
+      { type: 'timed', name: 'Shoulder rolls', seconds: 30, figure: 'shoulderroll',
+        instruction: 'Up, back and down in big slow circles.', cues: [{ at: 15, say: 'Reverse direction' }] },
+      { type: 'timed', name: 'Standing chest opener', seconds: 30, figure: 'chestopener',
+        instruction: 'Hands behind you, open the chest, look slightly up.' },
+      { type: 'timed', name: 'Standing hamstring reach', seconds: 30, figure: 'hamstring',
+        instruction: 'Soft knees, hinge at the hips and reach toward the toes.' },
+      { type: 'timed', name: 'Calf raises', seconds: 30, figure: 'calfraise',
+        instruction: 'Rise onto the toes, pause, lower slowly.' },
+      { type: 'timed', name: 'Eyes far away', seconds: 20, anim: 'eyes',
+        instruction: 'Look at something at least 6 m (20 ft) away. Blink slowly.' },
+    ],
+  },
+};
+</script>
+<script>
+/* Stick-figure demo cues. Each figure is two poses (A, B) blended back and forth,
+ * or a function of t (0..1 within one cycle). ViewBox 0 0 200 140, ground at y=123. */
+window.Figures = (function () {
+  'use strict';
+  var NS = 'http://www.w3.org/2000/svg';
+  function P(o, extra) { var r = {}, k; for (k in o) r[k] = o[k]; for (k in extra) r[k] = extra[k]; return r; }
+  function rot(pt, c, a) {
+    var s = Math.sin(a), co = Math.cos(a), x = pt[0] - c[0], y = pt[1] - c[1];
+    return [c[0] + x * co - y * s, c[1] + x * s + y * co];
+  }
+  var SIDE = { h: [100, 30], n: [100, 44], p: [100, 80], k1: [100, 102], f1: [100, 123], e1: [100, 62], w1: [101, 78] };
+  var FRONT = {
+    h: [100, 30], n: [100, 44], p: [100, 80], s1: [88, 47], s2: [112, 47],
+    e1: [85, 63], w1: [84, 79], e2: [115, 63], w2: [116, 79],
+    k1: [94, 102], f1: [92, 123], k2: [106, 102], f2: [108, 123]
+  };
+  var SEATED_SIDE = { h: [91, 42], n: [94, 55], p: [102, 92], e1: [104, 73], w1: [108, 94] };
+
+  var DEFS = {
+    march: {
+      period: 1.2,
+      A: P(SIDE, { k1: [118, 88], f1: [114, 108], k2: [100, 102], f2: [100, 123], e1: [94, 58], w1: [90, 72], e2: [106, 58], w2: [114, 68] }),
+      B: P(SIDE, { k1: [100, 102], f1: [100, 123], k2: [118, 88], f2: [114, 108], e1: [106, 58], w1: [114, 68], e2: [94, 58], w2: [90, 72] })
+    },
+    armcircles: {
+      period: 1.6,
+      fn: function (t) {
+        var a = 2 * Math.PI * t, o = P(FRONT, {});
+        o.w1 = [62 + 7 * Math.cos(a), 46 + 7 * Math.sin(a)];
+        o.w2 = [138 - 7 * Math.cos(a), 46 + 7 * Math.sin(a)];
+        o.e1 = [(o.s1[0] + o.w1[0]) / 2, (o.s1[1] + o.w1[1]) / 2];
+        o.e2 = [(o.s2[0] + o.w2[0]) / 2, (o.s2[1] + o.w2[1]) / 2];
+        return o;
+      }
+    },
+    squat: {
+      period: 3,
+      A: P(SIDE, { k1: [101, 102], e1: [112, 50], w1: [126, 48] }),
+      B: { h: [93, 52], n: [90, 64], p: [78, 96], k1: [102, 103], f1: [100, 123], e1: [104, 68], w1: [119, 64] }
+    },
+    pushup: {
+      period: 2.4,
+      A: { h: [152, 93], n: [140, 99], p: [92, 111], k1: [66, 117], f1: [40, 123], e1: [140, 111], w1: [141, 123] },
+      B: { h: [152, 108], n: [140, 114], p: [92, 118], k1: [66, 121], f1: [40, 123], e1: [129, 116], w1: [141, 123] }
+    },
+    row: {
+      period: 2.4, props: ['bag'],
+      A: { h: [132, 52], n: [122, 60], p: [88, 78], k1: [95, 100], f1: [90, 123], e1: [123, 74], w1: [124, 88] },
+      B: { h: [132, 52], n: [122, 60], p: [88, 78], k1: [95, 100], f1: [90, 123], e1: [108, 66], w1: [118, 78] }
+    },
+    pike: {
+      period: 2.6,
+      A: { h: [132, 113], n: [124, 106], p: [98, 82], k1: [86, 102], f1: [75, 123], e1: [129, 114], w1: [132, 123] },
+      B: { h: [134, 116], n: [126, 113], p: [99, 84], k1: [87, 103], f1: [75, 123], e1: [118, 116], w1: [132, 123] }
+    },
+    bridge: {
+      period: 2.6,
+      A: { h: [38, 115], n: [52, 119], p: [88, 121], k1: [108, 100], f1: [124, 123], e1: [68, 122], w1: [82, 122] },
+      B: { h: [38, 115], n: [52, 118], p: [86, 104], k1: [110, 98], f1: [124, 123], e1: [68, 122], w1: [82, 122] }
+    },
+    plank: {
+      period: 3,
+      A: { h: [150, 95], n: [138, 100], p: [92, 110], k1: [66, 116], f1: [40, 122], e1: [138, 122], w1: [156, 122] },
+      B: { h: [150, 95], n: [138, 100], p: [92, 108], k1: [66, 115], f1: [40, 122], e1: [138, 122], w1: [156, 122] }
+    },
+    crunch: {
+      period: 2.4, props: ['chairLow'],
+      A: { h: [47, 116], n: [60, 120], p: [96, 120], k1: [120, 99], f1: [146, 99], e1: [52, 109], w1: [44, 111] },
+      B: { h: [56, 103], n: [66, 110], p: [96, 120], k1: [120, 99], f1: [146, 99], e1: [58, 99], w1: [52, 103] }
+    },
+    kneetuck: {
+      period: 2.4, props: ['chairSide'],
+      A: P(SEATED_SIDE, { k1: [124, 96], f1: [146, 104] }),
+      B: P(SEATED_SIDE, { h: [88, 44], n: [92, 57], k1: [116, 74], f1: [124, 92] })
+    },
+    legraise: {
+      period: 2.8, props: ['chairSide'],
+      A: P(SEATED_SIDE, { k1: [124, 98], f1: [146, 104] }),
+      B: P(SEATED_SIDE, { h: [88, 44], n: [92, 57], k1: [123, 90], f1: [144, 80] })
+    },
+    sidecrunch: {
+      period: 2.4, props: ['chairFront'],
+      fn: function (t) {
+        var u = (1 - Math.cos(2 * Math.PI * t)) / 2, a = -0.3 * u, c = [100, 94];
+        var up = { h: [100, 44], n: [100, 58], s1: [88, 60], s2: [112, 60], e1: [79, 50], w1: [94, 40], e2: [121, 50], w2: [106, 40] };
+        var o = { p: [100, 94], k1: [91, 100], f1: [91, 123], k2: [109, 100], f2: [109, 123] };
+        for (var k in up) o[k] = rot(up[k], c, a);
+        return o;
+      }
+    },
+    neckroll: {
+      period: 4,
+      fn: function (t) {
+        var th = 0.75 * Math.sin(2 * Math.PI * t), o = P(FRONT, {});
+        o.h = [100 + 14 * Math.sin(th), 44 - 14 * Math.cos(th) + 2 * (1 - Math.cos(th))];
+        return o;
+      }
+    },
+    shoulderroll: {
+      period: 2.2,
+      fn: function (t) {
+        var a = 2 * Math.PI * t, o = P(FRONT, {}), dy = 3.5 * Math.sin(a), dx = 1.5 * Math.cos(a);
+        o.s1 = [88 - dx, 47 + dy]; o.s2 = [112 + dx, 47 + dy];
+        o.e1 = [o.s1[0] - 3, o.s1[1] + 16]; o.w1 = [o.s1[0] - 4, o.s1[1] + 32];
+        o.e2 = [o.s2[0] + 3, o.s2[1] + 16]; o.w2 = [o.s2[0] + 4, o.s2[1] + 32];
+        return o;
+      }
+    },
+    chestopener: {
+      period: 4,
+      A: P(FRONT, {}),
+      B: P(FRONT, { h: [100, 29], e1: [74, 58], w1: [62, 66], e2: [126, 58], w2: [138, 66] })
+    },
+    hamstring: {
+      period: 5,
+      A: P(SIDE, { e1: [101, 30], w1: [102, 16] }),
+      B: { h: [134, 108], n: [126, 98], p: [96, 80], k1: [101, 102], f1: [100, 123], e1: [120, 110], w1: [110, 120] }
+    },
+    calfraise: {
+      period: 2.2,
+      A: P(SIDE, { toe: [111, 123] }),
+      B: { h: [100, 23], n: [100, 37], p: [100, 73], k1: [100, 95], f1: [102, 116], e1: [100, 55], w1: [101, 71], toe: [111, 123] }
+    },
+    lunge: {
+      period: 6,
+      A: { h: [96, 50], n: [96, 64], p: [96, 100], k1: [120, 100], f1: [124, 123], k2: [82, 122], f2: [58, 123], e1: [88, 80], w1: [96, 94] },
+      B: { h: [101, 52], n: [101, 66], p: [101, 102], k1: [121, 100], f1: [124, 123], k2: [83, 122], f2: [58, 123], e1: [93, 82], w1: [101, 96] }
+    },
+    glute: {
+      period: 6,
+      A: { h: [38, 115], n: [52, 119], p: [88, 121], k2: [104, 98], f2: [120, 104], k1: [108, 108], f1: [104, 96], e1: [72, 108], w1: [98, 100] },
+      B: { h: [38, 115], n: [52, 119], p: [88, 121], k2: [100, 94], f2: [116, 98], k1: [104, 104], f1: [100, 92], e1: [70, 106], w1: [94, 97] }
+    }
+  };
+
+  function lerp(a, b, u) { return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u]; }
+  function pose(def, t) {
+    if (def.fn) return def.fn(t);
+    var u = (1 - Math.cos(2 * Math.PI * t)) / 2, o = {};
+    for (var k in def.A) o[k] = def.B && def.B[k] ? lerp(def.A[k], def.B[k], u) : def.A[k];
+    return o;
+  }
+  function el(tag, attrs, parent) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function pts() {
+    var s = '';
+    for (var i = 0; i < arguments.length; i++) if (arguments[i]) s += arguments[i][0].toFixed(1) + ',' + arguments[i][1].toFixed(1) + ' ';
+    return s;
+  }
+
+  var svg, g, parts = {}, props = {}, current = null;
+  function mount(svgEl) {
+    svg = svgEl;
+    el('line', { x1: 14, y1: 127, x2: 186, y2: 127, class: 'fig-ground' }, svg);
+    g = el('g', {}, svg);
+    var pg = el('g', { class: 'fig-prop' }, g);
+    props.chairSide = el('path', { d: 'M80 97 H114 M82 97 V62 M82 97 V125 M112 97 V125' }, pg);
+    props.chairLow = el('path', { d: 'M116 102 H152 M118 102 V125 M150 102 V125 M150 102 V74' }, pg);
+    props.chairFront = el('path', { d: 'M76 97 H124 M80 97 V125 M120 97 V125' }, pg);
+    props.bag = el('rect', { width: 12, height: 10, rx: 2 }, pg);
+    ['arm2', 'leg2'].forEach(function (k) { parts[k] = el('polyline', { class: 'fig-limb far' }, g); });
+    parts.torso = el('polyline', { class: 'fig-limb' }, g);
+    parts.shoulders = el('polyline', { class: 'fig-limb' }, g);
+    parts.leg1 = el('polyline', { class: 'fig-limb' }, g);
+    parts.foot = el('polyline', { class: 'fig-limb' }, g);
+    parts.arm1 = el('polyline', { class: 'fig-limb' }, g);
+    parts.head = el('circle', { r: 8.5, class: 'fig-head' }, g);
+  }
+  function show(name) {
+    current = DEFS[name] || null;
+    for (var k in props) props[k].style.display = current && current.props && current.props.indexOf(k) >= 0 ? '' : 'none';
+  }
+  function draw(name, timeSec, mirror) {
+    if (!svg) return;
+    if (!current || current !== DEFS[name]) show(name);
+    if (!current) return;
+    var t = ((timeSec / current.period) % 1 + 1) % 1;
+    var o = pose(current, t);
+    g.setAttribute('transform', mirror ? 'translate(200,0) scale(-1,1)' : '');
+    parts.torso.setAttribute('points', pts(o.n, o.p));
+    parts.shoulders.setAttribute('points', o.s1 ? pts(o.s1, o.n, o.s2) : '');
+    parts.arm1.setAttribute('points', pts(o.s1 || o.n, o.e1, o.w1));
+    parts.arm2.setAttribute('points', o.e2 ? pts(o.s2 || o.n, o.e2, o.w2) : '');
+    parts.leg1.setAttribute('points', pts(o.p, o.k1, o.f1));
+    parts.leg2.setAttribute('points', o.k2 ? pts(o.p, o.k2, o.f2) : '');
+    parts.foot.setAttribute('points', o.toe ? pts(o.f1, o.toe) : '');
+    parts.head.setAttribute('cx', o.h[0].toFixed(1));
+    parts.head.setAttribute('cy', o.h[1].toFixed(1));
+    if (current.props && current.props.indexOf('bag') >= 0) {
+      props.bag.setAttribute('x', (o.w1[0] - 6).toFixed(1));
+      props.bag.setAttribute('y', (o.w1[1]).toFixed(1));
+    }
+  }
+  return { mount: mount, draw: draw, has: function (n) { return !!DEFS[n]; }, names: Object.keys(DEFS) };
+})();
+</script>
+<script>
+/* Home Coach – guided workout player. Plain JS, no dependencies. */
+(function () {
+  'use strict';
+
+  var SESSIONS = window.COACH_SESSIONS;
+  var qs = new URLSearchParams(location.search);
+  var SPEED = Math.min(60, Math.max(0.1, parseFloat(qs.get('speed')) || 1)); // debug: ?speed=10
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* ---------- storage ---------- */
+  var LS = {
+    get: function (k, d) { try { var v = localStorage.getItem('coach.' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set: function (k, v) { try { localStorage.setItem('coach.' + k, JSON.stringify(v)); } catch (e) { /* private mode */ } }
+  };
+  var prefs = { sound: LS.get('sound', true), voice: LS.get('voice', true) };
+
+  /* ---------- helpers ---------- */
+  function fmt(sec) {
+    sec = Math.max(0, Math.round(sec));
+    var m = Math.floor(sec / 60), s = sec % 60;
+    return m + ':' + (s < 10 ? '0' : '') + s;
+  }
+  function fmtMin(sec) { return sec < 90 ? Math.round(sec) + ' s' : '~' + Math.round(sec / 60) + ' min'; }
+  function spoken(t) { return String(t).replace(/[–-]/g, ' to '); }
+  function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+  function clamp01(t) { return t < 0 ? 0 : t > 1 ? 1 : t; }
+  var textCache = new Map();
+  function setText(el, txt) { if (textCache.get(el) !== txt) { textCache.set(el, txt); el.textContent = txt; } }
+
+  /* ---------- audio (Web Audio beeps) ---------- */
+  var Sound = {
+    ctx: null,
+    unlock: function () {
+      try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* Safari 17+ only */ }
+      try {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        if (!this.ctx) this.ctx = new AC();
+        if (this.ctx.state !== 'running') this.ctx.resume();
+        var b = this.ctx.createBuffer(1, 1, 22050), s = this.ctx.createBufferSource();
+        s.buffer = b; s.connect(this.ctx.destination); s.start(0);
+      } catch (e) { /* no audio */ }
+    },
+    tone: function (freq, dur, o) {
+      o = o || {};
+      var c = this.ctx, t = c.currentTime + (o.at || 0), vol = o.vol || 0.25;
+      var osc = c.createOscillator(), g = c.createGain();
+      osc.type = o.type || 'sine';
+      osc.frequency.setValueAtTime(freq, t);
+      if (o.slide) osc.frequency.exponentialRampToValueAtTime(o.slide, t + dur);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      osc.connect(g); g.connect(c.destination);
+      osc.start(t); osc.stop(t + dur + 0.05);
+    },
+    play: function (name) {
+      if (!prefs.sound || !this.ctx) return;
+      if (this.ctx.state !== 'running') { try { this.ctx.resume(); } catch (e) {} }
+      var T = this.tone.bind(this);
+      try {
+        switch (name) {
+          case 'start': T(660, 0.22, { slide: 990, vol: 0.3 }); break;              // squeeze / go: rising
+          case 'relax': T(560, 0.4, { slide: 330, vol: 0.25 }); break;              // relax / rest: falling
+          case 'tick': T(1250, 0.07, { type: 'square', vol: 0.07 }); break;         // last-3-seconds tick
+          case 'flick': T(900, 0.09, { vol: 0.22 }); break;                         // quick flick blip
+          case 'switch': T(740, 0.11, { vol: 0.25 }); T(740, 0.11, { at: 0.18, vol: 0.25 }); break;
+          case 'in': T(392, 0.5, { slide: 523, vol: 0.1 }); break;                  // soft breathe in
+          case 'out': T(494, 0.7, { slide: 330, vol: 0.08 }); break;                // soft breathe out
+          case 'set': [523, 659, 784].forEach(function (f, i) { T(f, 0.25, { at: i * 0.12, vol: 0.22 }); }); break;
+          case 'done': [523, 659, 784, 1047].forEach(function (f, i) { T(f, 0.35, { at: i * 0.14, vol: 0.22 }); }); break;
+        }
+      } catch (e) { /* ignore */ }
+    }
+  };
+
+  /* ---------- speech ---------- */
+  var Voice = {
+    ok: 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window,
+    voice: null,
+    pick: function () {
+      if (!this.ok) return;
+      var vs = speechSynthesis.getVoices() || [];
+      var en = vs.filter(function (v) { return /^en([-_]|$)/i.test(v.lang); });
+      this.voice = en.find(function (v) { return /Samantha|Karen|Daniel|Moira|Serena|Google UK English Female|Google US English/i.test(v.name); }) ||
+        en.find(function (v) { return v.localService; }) || en[0] || null;
+    },
+    say: function (text, interrupt) {
+      if (!this.ok || !prefs.voice || !text) return;
+      try {
+        if (interrupt) speechSynthesis.cancel();
+        var u = new SpeechSynthesisUtterance(text);
+        if (!this.voice) this.pick();
+        if (this.voice) { u.voice = this.voice; u.lang = this.voice.lang; } else u.lang = 'en-US';
+        u.rate = 1; u.pitch = 1; u.volume = 1;
+        speechSynthesis.speak(u);
+      } catch (e) { /* ignore */ }
+    },
+    stop: function () { if (this.ok) try { speechSynthesis.cancel(); } catch (e) {} },
+    unlock: function () {
+      if (!this.ok) return;
+      try { this.pick(); var u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch (e) {}
+    }
+  };
+  if (Voice.ok) { try { speechSynthesis.onvoiceschanged = function () { Voice.pick(); }; } catch (e) {} }
+
+  /* ---------- wake lock ---------- */
+  var wakeLock = null;
+  function lockOn() {
+    try {
+      if ('wakeLock' in navigator && !wakeLock && document.visibilityState === 'visible') {
+        navigator.wakeLock.request('screen').then(function (l) {
+          wakeLock = l; l.addEventListener('release', function () { wakeLock = null; });
+        }).catch(function () {});
+      }
+    } catch (e) {}
+  }
+  function lockOff() { try { if (wakeLock) wakeLock.release(); } catch (e) {} wakeLock = null; }
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && st.running) lockOn(); });
+
+  /* ---------- build steps from session data ---------- */
+  function holdTimes(S, week) {
+    var rows = S.holdByWeek || [];
+    for (var i = 0; i < rows.length; i++) if (week <= rows[i].maxWeek) return rows[i];
+    return { hold: 5, relax: 5 };
+  }
+  function restStep(seconds, say, extra) {
+    var s = {
+      kind: 'timed', name: 'Rest', anim: 'rest', isRest: true, sayNext: true,
+      instruction: 'Shake it out and breathe easy.',
+      phases: [{ type: 'rest', dur: seconds, label: 'Rest', say: say, tone: 'relax', ticks: true }]
+    };
+    for (var k in extra) s[k] = extra[k];
+    return s;
+  }
+
+  function build(key, week) {
+    var S = SESSIONS[key], steps = [], overview = [];
+    var ready = S.readySeconds || 0, lastSection = null, lastOvHeader = null, seenOptional = {};
+    function add(step, b) {
+      step.section = step.section || b.section || b.optional || '';
+      step.optional = b.optional || null;
+      step.sectionKey = b.section || b.optional || b.name;
+      steps.push(step);
+      return step;
+    }
+    function header(b, title) {
+      if (b.section && b.section !== lastOvHeader) { overview.push({ header: true, key: b.section, title: title || b.section }); lastOvHeader = b.section; }
+      if (!b.section) lastOvHeader = null;
+    }
+    function sectionIntro(b) {
+      var sec = b.section || b.optional;
+      if (sec && sec !== lastSection) { lastSection = sec; return sec + '. '; }
+      if (!sec) lastSection = null;
+      return '';
+    }
+
+    S.blocks.forEach(function (b) {
+      var first = steps.length, r, s, i, phases;
+      switch (b.type) {
+        case 'breathing': {
+          var n = Math.max(1, Math.round(b.seconds / (b.inhale + b.exhale)));
+          phases = [{ type: 'ready', dur: 6, label: 'Get comfortable', say: sectionIntro(b) + b.name + '. ' + b.instruction }];
+          for (i = 1; i <= n; i++) {
+            phases.push({ type: 'inhale', dur: b.inhale, label: 'Breathe in', say: 'Breathe in', tone: 'in', rep: i, reps: n, repWord: 'Breath' });
+            phases.push({ type: 'exhale', dur: b.exhale, label: 'Breathe out', say: 'Breathe out', tone: 'out', rep: i, reps: n, repWord: 'Breath' });
+          }
+          add({ kind: 'timed', name: b.name, anim: 'breathe', instruction: b.instruction, phases: phases }, b);
+          header(b);
+          overview.push({ title: b.name, detail: n + ' slow breaths · in ' + b.inhale + ' s, out ' + b.exhale + ' s', from: first, optional: b.optional });
+          break;
+        }
+        case 'holds': {
+          var ht = holdTimes(S, week);
+          var hold = b.hold === 'week' ? ht.hold : b.hold, relax = b.relax === 'week' ? ht.relax : b.relax;
+          var flick = b.anim === 'pulse', rel = b.anim === 'ripple', voiced = b.perRepVoice !== false;
+          for (s = 1; s <= b.sets; s++) {
+            var intro = (s === 1 ? sectionIntro(b) + (b.introSay || b.name + '.') + ' ' : '') +
+              (b.sets > 1 ? 'Set ' + s + ' of ' + b.sets + '. ' : '') + 'Get ready.';
+            phases = [{ type: 'ready', dur: s === 1 && b.introSay ? 6 : 4, label: 'Get ready', say: intro }];
+            for (r = 1; r <= b.reps; r++) {
+              phases.push({
+                type: flick ? 'flick' : rel ? 'release' : 'squeeze', dur: hold, label: b.squeezeLabel, rep: r, reps: b.reps,
+                tone: flick ? 'flick' : 'start', interrupt: true,
+                say: voiced ? (r === b.reps && b.reps > 1 ? 'Last one. ' : '') + b.squeezeSay : null
+              });
+              phases.push({
+                type: flick ? 'flickrel' : rel ? 'restRep' : 'relax', dur: relax, label: b.relaxLabel, rep: r, reps: b.reps,
+                tone: flick ? null : 'relax', interrupt: true, say: voiced ? b.relaxSay : null
+              });
+            }
+            add({ kind: 'timed', name: b.name, set: s, sets: b.sets, anim: b.anim, instruction: b.instruction, phases: phases, endTone: 'set', spokenName: b.name, clockMode: hold <= 2 ? 'step' : null }, b);
+            if (s < b.sets && b.restBetweenSets) add(restStep(b.restBetweenSets, 'Set complete. Rest ' + b.restBetweenSets + ' seconds.'), b);
+          }
+          header(b);
+          overview.push({
+            title: b.name, from: first, optional: b.optional,
+            detail: (b.sets > 1 ? b.sets + ' sets × ' : '') + b.reps + ' reps · ' + hold + ' s ' + b.squeezeLabel.toLowerCase() + ' / ' + relax + ' s ' + b.relaxLabel.toLowerCase()
+          });
+          break;
+        }
+        case 'stretch': {
+          var optIntro = '';
+          if (b.optional && !seenOptional[b.optional]) { seenOptional[b.optional] = true; optIntro = b.optional + '. Tap skip if you want to finish now. '; lastSection = b.optional; }
+          phases = [
+            { type: 'ready', dur: optIntro ? 8 : 5, label: 'Get into position', say: optIntro + sectionIntro(b) + b.name + '. Left side.' },
+            { type: 'work', dur: b.perSide, label: 'Hold · left side', side: 'left', tone: 'start', ticks: true },
+            { type: 'switch', dur: 5, label: 'Switch sides', say: 'Switch sides', tone: 'switch', interrupt: true },
+            { type: 'work', dur: b.perSide, label: 'Hold · right side', side: 'right', tone: 'start', ticks: true }
+          ];
+          add({ kind: 'timed', name: b.name, anim: 'figure', figure: b.figure, instruction: b.instruction, phases: phases }, b);
+          header(b);
+          overview.push({ title: b.name, detail: b.perSide + ' s per side', from: first, optional: b.optional });
+          break;
+        }
+        case 'timed': {
+          phases = [];
+          var introT = sectionIntro(b) + b.name;
+          if (ready) phases.push({ type: 'ready', dur: ready, label: 'Get ready', say: introT });
+          phases.push({ type: 'work', dur: b.seconds, label: 'Keep going', say: ready ? null : introT, tone: 'start', ticks: true, cues: b.cues });
+          add({ kind: 'timed', name: b.name, anim: b.anim || 'figure', figure: b.figure, instruction: b.instruction, phases: phases }, b);
+          header(b);
+          overview.push({ title: b.name, detail: b.seconds + ' s', from: first, optional: b.optional });
+          break;
+        }
+        case 'circuit': {
+          header(b, b.section + ' · ' + b.rounds + ' rounds');
+          for (r = 1; r <= b.rounds; r++) {
+            b.exercises.forEach(function (ex, xi) {
+              var pre = (xi === 0 ? sectionIntro(b) + 'Round ' + r + ' of ' + b.rounds + '. ' : '');
+              var base = { name: ex.name, figure: ex.figure, anim: 'figure', instruction: ex.instruction, round: r, rounds: b.rounds, logKey: 'r' + r + ':' + ex.name };
+              if (ex.reps) {
+                base.kind = 'reps'; base.target = ex.reps; base.est = ex.est || 40; base.log = 'reps';
+                base.say = pre + ex.name + '. ' + spoken(ex.reps) + ' reps. Tap done when finished.';
+              } else {
+                base.kind = 'timed'; base.log = ex.log || null;
+                base.phases = [
+                  { type: 'ready', dur: 4, label: 'Get into position', say: pre + ex.name + '. Get into position.' },
+                  { type: 'work', dur: ex.seconds, label: 'Hold it', say: 'Go', tone: 'start', ticks: true }
+                ];
+              }
+              add(base, b);
+              var lastEx = xi === b.exercises.length - 1;
+              if (!lastEx) add(restStep(b.restBetweenExercises, 'Rest ' + b.restBetweenExercises + ' seconds.', { round: r, rounds: b.rounds }), b);
+              else if (r < b.rounds) add(restStep(b.restBetweenRounds, 'Round ' + r + ' complete. Rest ' + b.restBetweenRounds + ' seconds.', { round: r, rounds: b.rounds, name: 'Round rest' }), b);
+            });
+          }
+          b.exercises.forEach(function (ex) {
+            overview.push({ title: ex.name, detail: ex.reps ? ex.reps + ' reps' : ex.seconds + ' s hold' });
+          });
+          overview.push({ title: 'Rests', detail: b.restBetweenExercises + ' s between moves · ' + b.restBetweenRounds + ' s between rounds', muted: true });
+          break;
+        }
+        case 'interval': {
+          header(b, b.section + ' · ' + b.rounds + ' rounds');
+          for (r = 1; r <= b.rounds; r++) {
+            b.exercises.forEach(function (ex, xi) {
+              var isFirst = r === 1 && xi === 0 && b.setup;
+              add({
+                kind: 'timed', name: isFirst ? b.setup.label : 'Transition', anim: 'rest', isRest: true, isTransition: true,
+                round: r, rounds: b.rounds, instruction: isFirst ? 'Place it on a non-slip surface or against a wall.' : 'Get set for the next move.',
+                phases: [{ type: 'rest', dur: isFirst ? b.setup.seconds : b.transition, label: 'Get ready', tone: 'relax', ticks: true,
+                  say: (isFirst ? sectionIntro(b) + b.setup.label + '. ' : '') + 'Next: ' + ex.name }]
+              }, b);
+              add({
+                kind: 'timed', name: ex.name, anim: 'figure', figure: ex.figure, mirror: ex.side === 'right', instruction: ex.instruction,
+                round: r, rounds: b.rounds, interval: true,
+                phases: [{ type: 'work', dur: b.work, label: 'Keep going', say: 'Go', tone: 'start', ticks: true }]
+              }, b);
+            });
+          }
+          b.exercises.forEach(function (ex) { overview.push({ title: ex.name, detail: b.work + ' s × ' + b.rounds + ' rounds' }); });
+          overview.push({ title: 'Transitions', detail: b.transition + ' s between moves', muted: true });
+          break;
+        }
+      }
+    });
+
+    // durations + "Next: ..." speech for rest steps
+    steps.forEach(function (step, i) {
+      step.index = i;
+      step.dur = step.kind === 'reps' ? step.est : step.phases.reduce(function (a, p) { return a + p.dur; }, 0);
+    });
+    steps.forEach(function (step, i) {
+      var nx = steps[i + 1];
+      if (step.sayNext && nx) step.phases[0].say += ' Next: ' + spokenStep(nx) + '.';
+    });
+    // section totals for overview headers / rows
+    overview.forEach(function (o, idx) {
+      if (o.header) o.seconds = steps.filter(function (s) { return s.sectionKey === o.key; }).reduce(function (a, s) { return a + s.dur; }, 0);
+      else if (o.from !== undefined) {
+        var nextFrom = steps.length;
+        for (var j = idx + 1; j < overview.length; j++) if (overview[j].from !== undefined) { nextFrom = overview[j].from; break; }
+        o.seconds = steps.slice(o.from, nextFrom).reduce(function (a, s) { return a + s.dur; }, 0);
+      }
+    });
+    var total = steps.reduce(function (a, s) { return a + s.dur; }, 0);
+    return { steps: steps, overview: overview, total: total };
+  }
+  function spokenStep(s) {
+    return s.name + (s.sets > 1 ? ', set ' + s.set + ' of ' + s.sets : '');
+  }
+  function stepLabel(s) {
+    if (!s) return 'Finish';
+    var bits = [s.name];
+    if (s.sets > 1) bits.push('Set ' + s.set + ' of ' + s.sets);
+    if (s.kind === 'reps') bits.push(s.target + ' reps');
+    else bits.push(fmt(s.dur));
+    return bits.join(' · ');
+  }
+
+  /* ---------- state ---------- */
+  var st = {
+    key: null, week: 1, plan: null, steps: [], i: 0, p: 0, pt: 0, se: 0,
+    running: false, started: false, finished: false, last: 0, realSec: 0,
+    logs: {}, completed: {}
+  };
+  function cur() { return st.steps[st.i]; }
+  function curPhase() { var s = cur(); return s && s.kind === 'timed' ? s.phases[st.p] : null; }
+
+  /* ---------- engine ---------- */
+  function frame(now) {
+    if (!st.running) return;
+    now = now || performance.now();
+    var dt = (now - st.last) / 1000;
+    st.last = now;
+    if (!(dt > 0)) dt = 0;
+    if (dt > 2) dt = 2; // phone was locked/suspended: don't fast-forward
+    st.realSec += dt;
+    advance(dt * SPEED);
+  }
+  function advance(dt) {
+    var step = cur();
+    if (!step) return;
+    st.se += dt;
+    if (step.kind === 'reps') return;
+    var remaining = dt, guard = 0;
+    while (remaining > 0 && st.running && guard++ < 500) {
+      var ph = step.phases[st.p];
+      var use = Math.min(ph.dur - st.pt, remaining);
+      var before = st.pt, after = st.pt + use;
+      if (ph.ticks && ph.dur >= 4) {
+        for (var k = 3; k >= 1; k--) { var tt = ph.dur - k; if (before < tt && after >= tt) Sound.play('tick'); }
+      }
+      if (ph.cues) ph.cues.forEach(function (c) { if (before < c.at && after >= c.at) { Sound.play('switch'); Voice.say(c.say, true); } });
+      st.pt = after; remaining -= use;
+      if (st.pt >= ph.dur - 1e-9) {
+        st.p++; st.pt = 0;
+        if (st.p >= step.phases.length) { completeStep(); return; }
+        enterPhase();
+      }
+    }
+  }
+  function enterPhase() {
+    var ph = curPhase();
+    if (!ph) return;
+    if (ph.tone) Sound.play(ph.tone);
+    if (ph.say) Voice.say(ph.say, ph.interrupt);
+  }
+  function enterStep() {
+    var step = cur();
+    st.p = 0; st.pt = 0; st.se = 0;
+    if (step.kind === 'reps') {
+      Sound.play('start');
+      Voice.say(step.say, true);
+      var lg = st.logs[step.logKey];
+      $('repsInput').value = lg && lg.value !== '' && lg.value != null ? lg.value : '';
+    } else enterPhase();
+  }
+  function goTo(i) {
+    st.i = Math.max(0, Math.min(st.steps.length - 1, i));
+    enterStep();
+    render();
+  }
+  function recordLeaving(natural) {
+    var step = cur();
+    if (!step) return;
+    if (step.kind === 'reps') saveReps(step);
+    if (step.log === 'time') {
+      var secs = 0, ph = curPhase();
+      if (natural) secs = step.phases[step.phases.length - 1].dur;
+      else if (ph && ph.type === 'work') secs = Math.round(st.pt);
+      if (natural || secs > 0) st.logs[step.logKey] = { name: step.name, round: step.round, value: secs, unit: 's' };
+    }
+    if (natural) st.completed[step.index] = true;
+  }
+  function saveReps(step) {
+    var v = $('repsInput').value.trim();
+    var prev = st.logs[step.logKey];
+    if (v !== '' || !prev) st.logs[step.logKey] = { name: step.name, round: step.round, value: v === '' ? '' : Math.max(0, parseInt(v, 10) || 0), unit: 'reps' };
+  }
+  function completeStep() {
+    var step = cur();
+    recordLeaving(true);
+    if (step.endTone) Sound.play(step.endTone);
+    if (st.i + 1 >= st.steps.length) finish(); else goTo(st.i + 1);
+  }
+
+  function resume() {
+    Sound.unlock();
+    st.running = true;
+    st.last = performance.now();
+    lockOn();
+    render();
+  }
+  function pause() {
+    st.running = false;
+    Voice.stop();
+    lockOff();
+    render();
+  }
+  function startSession(fresh) {
+    Sound.unlock();
+    Voice.unlock();
+    var sameRun = st.started && !st.finished && st.plan && st.plan.key === st.key && st.plan.week === st.week;
+    showScreen('player');
+    if (fresh || !sameRun) {
+      var plan = build(st.key, st.week);
+      plan.key = st.key; plan.week = st.week;
+      st.plan = plan; st.steps = plan.steps;
+      st.logs = {}; st.completed = {}; st.realSec = 0;
+      st.started = true; st.finished = false;
+      setText($('pTitle'), SESSIONS[st.key].short || SESSIONS[st.key].title);
+      var tip = SESSIONS[st.key].tip;
+      $('pTip').hidden = !tip; if (tip) $('pTip').textContent = tip;
+      st.running = true; st.last = performance.now();
+      goTo(0);
+    }
+    resume();
+  }
+  function finish() {
+    st.running = false; st.finished = true;
+    lockOff();
+    Sound.play('done');
+    Voice.say('Session complete. Nice work.', false);
+    renderDone();
+    showScreen('done');
+  }
+
+  /* ---------- player rendering ---------- */
+  var COLORS = {
+    squeeze: '--warm', flick: '--warm', switch: '--warm', relax: '--cool', flickrel: '--cool', restRep: '--cool',
+    rest: '--cool', exhale: '--cool', release: '--soft', inhale: '--accent', work: '--accent', ready: '--text', reps: '--go'
+  };
+  var lastColor = null;
+  function setPhaseColor(type) {
+    var c = COLORS[type] || '--accent';
+    if (c !== lastColor) { lastColor = c; document.documentElement.style.setProperty('--phase', 'var(' + c + ')'); }
+  }
+  function remainingSec() {
+    var step = cur(); if (!step) return 0;
+    var r;
+    if (step.kind === 'reps') r = Math.max(0, step.est - st.se);
+    else {
+      var done = 0;
+      for (var i = 0; i < st.p; i++) done += step.phases[i].dur;
+      r = step.dur - done - st.pt;
+    }
+    for (var j = st.i + 1; j < st.steps.length; j++) r += st.steps[j].dur;
+    return Math.max(0, r);
+  }
+  function metaFor(step, ph) {
+    var bits = [];
+    if (step.round && !step.isRest) bits.push('Round ' + step.round + ' of ' + step.rounds);
+    if (step.sets > 1) bits.push('Set ' + step.set + ' of ' + step.sets);
+    if (ph && ph.reps) bits.push((ph.repWord || 'Rep') + ' ' + ph.rep + ' of ' + ph.reps);
+    else if (step.sets && ph && ph.type === 'ready') { var rr = step.phases[1] && step.phases[1].reps; if (rr) bits.push(rr + ' reps'); }
+    if (ph && ph.side) bits.push(ph.side === 'left' ? 'Left side' : 'Right side');
+    if (step.kind === 'reps') bits.push('Target ' + step.target);
+    if (step.isRest && !step.isTransition && step.round) bits.push('Round ' + step.round + ' of ' + step.rounds);
+    return bits.join(' · ');
+  }
+  var PLAY = 'M8 5v14l11-7z', PAUSE = 'M6 5h4v14H6zM14 5h4v14h-4z';
+  function render() {
+    var step = cur();
+    if (!step || $('player').hidden) return;
+    var ph = curPhase();
+    setText($('pSection'), step.section || '');
+    setText($('pName'), step.name);
+    setText($('pMeta'), metaFor(step, ph));
+    var clock = $('pClock'), isReps = step.kind === 'reps';
+    clock.classList.toggle('target', isReps);
+    if (isReps) {
+      setText(clock, step.target);
+      setText($('pPhase'), st.running ? 'reps · ' + fmt(st.se) : 'Paused');
+      setPhaseColor('reps');
+    } else {
+      var left = Math.ceil(ph.dur - st.pt - 1e-6);
+      if (step.clockMode === 'step' && ph.type !== 'ready') { // very short reps (quick flicks): count down the whole set
+        var spent = st.pt; for (var q = 0; q < st.p; q++) spent += step.phases[q].dur;
+        left = Math.ceil(step.dur - spent - 1e-6);
+      }
+      setText(clock, left >= 60 ? fmt(left) : String(Math.max(0, left)));
+      setText($('pPhase'), st.running ? ph.label : 'Paused');
+      setPhaseColor(ph.type);
+    }
+    setText($('pInstr'), step.instruction || '');
+    $('repsPanel').hidden = !isReps;
+    var sk = $('btnSkipGroup');
+    sk.hidden = !step.optional;
+    if (step.optional) setText(sk, 'Skip ' + step.optional.replace(/^optional\s+/i, '') + ' →');
+    setText($('pNext'), stepLabel(st.steps[st.i + 1]));
+    var total = st.plan.total, rem = remainingSec();
+    $('pBar').style.width = (100 * (1 - rem / total)).toFixed(1) + '%';
+    setText($('pCount'), 'Step ' + (st.i + 1) + ' of ' + st.steps.length + (SESSIONS[st.key].usesWeek ? ' · Week ' + st.week : ''));
+    setText($('pEta'), fmt(rem) + ' left');
+    var icon = st.running ? PAUSE : PLAY;
+    var path = $('playIcon').firstChild;
+    if (path.getAttribute('d') !== icon) path.setAttribute('d', icon);
+    drawCue(step, ph);
+  }
+
+  /* ---------- cue animations (SVG, driven by the timer) ---------- */
+  var NS = 'http://www.w3.org/2000/svg', C = 2 * Math.PI * 80, cue = {};
+  function mk(tag, attrs, parent) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    parent.appendChild(e); return e;
+  }
+  function mountCues() {
+    var svg = $('cueSvg');
+    var defs = mk('defs', {}, svg);
+    var gr = mk('radialGradient', { id: 'gBreath' }, defs);
+    mk('stop', { offset: '0%', 'stop-color': '#5eead4', 'stop-opacity': '0.95' }, gr);
+    mk('stop', { offset: '100%', 'stop-color': '#0ea5e9', 'stop-opacity': '0.35' }, gr);
+    // ring (squeeze/relax + rest countdown)
+    cue.ring = mk('g', {}, svg);
+    mk('circle', { cx: 100, cy: 100, r: 80, class: 'cue-track' }, cue.ring);
+    cue.arc = mk('circle', { cx: 100, cy: 100, r: 80, class: 'cue-ring', transform: 'rotate(-90 100 100)', 'stroke-dasharray': C.toFixed(1), 'stroke-dashoffset': C.toFixed(1) }, cue.ring);
+    cue.ringText = mk('text', { x: 100, y: 96, class: 'cue-text' }, cue.ring);
+    cue.ringSub = mk('text', { x: 100, y: 122, class: 'cue-sub' }, cue.ring);
+    // breathing circle
+    cue.breath = mk('g', {}, svg);
+    mk('circle', { cx: 100, cy: 100, r: 90, class: 'breath-guide' }, cue.breath);
+    cue.breathCore = mk('circle', { cx: 100, cy: 100, r: 40, class: 'breath-core' }, cue.breath);
+    cue.breathText = mk('text', { x: 100, y: 101, class: 'cue-text' }, cue.breath);
+    // quick-flick pulse
+    cue.pulse = mk('g', {}, svg);
+    cue.pulseRing = mk('circle', { cx: 100, cy: 100, r: 45, class: 'ripple-ring', style: 'stroke: var(--warm)' }, cue.pulse);
+    cue.pulseCore = mk('circle', { cx: 100, cy: 100, r: 40, class: 'pulse-core' }, cue.pulse);
+    // release ripple
+    cue.ripple = mk('g', {}, svg);
+    cue.ripples = [0, 1, 2].map(function () { return mk('circle', { cx: 100, cy: 100, r: 30, class: 'ripple-ring' }, cue.ripple); });
+    cue.rippleCore = mk('circle', { cx: 100, cy: 100, r: 28, class: 'ripple-core' }, cue.ripple);
+    // eyes far away
+    cue.eyes = mk('g', {}, svg);
+    mk('path', { d: 'M18 62 L52 34 L74 50 L108 20 L140 52 L160 40 L184 62', class: 'horizon' }, cue.eyes);
+    mk('path', { d: 'M36 120 Q100 66 164 120 Q100 174 36 120 Z', class: 'eye-white' }, cue.eyes);
+    cue.iris = mk('circle', { cx: 100, cy: 120, r: 22, class: 'eye-iris' }, cue.eyes);
+    cue.pupil = mk('circle', { cx: 100, cy: 120, r: 9, class: 'eye-pupil' }, cue.eyes);
+    Figures.mount($('figSvg'));
+  }
+  var shownCue = null;
+  function showCue(name) {
+    if (shownCue === name) return;
+    shownCue = name;
+    var isFig = name === 'figure';
+    $('stage').classList.toggle('fig', isFig);
+    $('cueSvg').style.display = isFig ? 'none' : '';
+    $('figSvg').style.display = isFig ? '' : 'none';
+    ['ring', 'breath', 'pulse', 'ripple', 'eyes'].forEach(function (k) {
+      cue[k].style.display = (k === name || (k === 'ring' && name === 'rest')) ? '' : 'none';
+    });
+  }
+  function drawCue(step, ph) {
+    var anim = step.anim === 'rest' ? 'rest' : step.anim === 'breathe' ? 'breath' : step.anim;
+    showCue(anim);
+    var t = ph ? clamp01(st.pt / ph.dur) : 0, svg = $('cueSvg');
+    svg.classList.toggle('glow', anim === 'ring' && ph && ph.type === 'squeeze');
+    if (anim === 'figure') {
+      Figures.draw(step.figure, st.se, step.mirror || (ph && ph.side === 'right'));
+    } else if (anim === 'ring') {
+      var fill = 0, label = 'Ready';
+      if (ph.type === 'squeeze') { fill = ease(t); label = t < 0.3 ? 'Squeeze' : 'Hold'; }
+      else if (ph.type === 'relax') { fill = 1 - ease(t); label = 'Relax'; }
+      cue.arc.setAttribute('stroke-dashoffset', (C * (1 - fill)).toFixed(1));
+      setText(cue.ringText, label);
+      setText(cue.ringSub, ph.reps ? 'REP ' + ph.rep + ' / ' + ph.reps : '');
+    } else if (anim === 'rest') {
+      var prog = clamp01(st.pt / ph.dur);
+      cue.arc.setAttribute('stroke-dashoffset', (C * prog).toFixed(1));
+      setText(cue.ringText, step.isTransition ? 'Next up' : 'Rest');
+      setText(cue.ringSub, step.isTransition ? '' : 'BREATHE');
+    } else if (anim === 'breath') {
+      var r = 38;
+      if (ph.type === 'inhale') r = 38 + 50 * ease(t);
+      else if (ph.type === 'exhale') r = 88 - 50 * ease(t);
+      cue.breathCore.setAttribute('r', r.toFixed(1));
+      setText(cue.breathText, ph.type === 'inhale' ? 'Breathe in' : ph.type === 'exhale' ? 'Breathe out' : 'Relax');
+    } else if (anim === 'pulse') {
+      var pr = 40, rr = 45, ro = 0;
+      if (ph.type === 'flick') { pr = 40 + 22 * Math.sin(Math.PI * Math.min(1, t * 1.6)); rr = 45 + 50 * t; ro = 1 - t; }
+      cue.pulseCore.setAttribute('r', pr.toFixed(1));
+      cue.pulseRing.setAttribute('r', rr.toFixed(1));
+      cue.pulseRing.style.opacity = ro.toFixed(2);
+    } else if (anim === 'ripple') {
+      var releasing = ph.type === 'release';
+      cue.ripples.forEach(function (c, k) {
+        var q = releasing ? t * 1.5 - k * 0.25 : -1;
+        if (q >= 0 && q <= 1) { c.setAttribute('r', (30 + 62 * ease(q)).toFixed(1)); c.style.opacity = (1 - q).toFixed(2); }
+        else c.style.opacity = '0';
+      });
+      cue.rippleCore.setAttribute('r', (releasing ? 28 + 8 * ease(t) : ph.type === 'restRep' ? 36 - 8 * ease(t) : 28).toFixed(1));
+    } else if (anim === 'eyes') {
+      var x = 100 + 16 * Math.sin(2 * Math.PI * st.se / 7);
+      cue.iris.setAttribute('cx', x.toFixed(1)); cue.pupil.setAttribute('cx', x.toFixed(1));
+    }
+  }
+
+  /* ---------- loop ---------- */
+  function rafLoop(now) { frame(now); if (st.running) render(); requestAnimationFrame(rafLoop); }
+  requestAnimationFrame(rafLoop);
+  setInterval(function () { if (st.running) { frame(performance.now()); if (document.hidden) render(); } }, 250); // keeps time when rAF is throttled
+
+  /* ---------- screens ---------- */
+  function showScreen(name) {
+    ['home', 'player', 'done'].forEach(function (s) { $(s).hidden = s !== name; });
+    window.scrollTo(0, 0);
+    if (name === 'player') { shownCue = null; render(); }
+    if (name === 'home') renderHome();
+  }
+  function setUrl() {
+    var p = new URLSearchParams(location.search);
+    p.set('s', st.key);
+    if (SESSIONS[st.key].usesWeek) p.set('w', st.week); else p.delete('w');
+    try { history.replaceState(null, '', location.pathname + '?' + p.toString()); } catch (e) {}
+  }
+  function renderHome() {
+    var S = SESSIONS[st.key], plan = build(st.key, st.week);
+    document.title = S.title + ' · Home Coach';
+    var picker = $('picker');
+    picker.innerHTML = '';
+    Object.keys(SESSIONS).forEach(function (k) {
+      var b = document.createElement('button');
+      b.className = 'pick'; b.type = 'button';
+      b.setAttribute('aria-pressed', String(k === st.key));
+      var tot = build(k, k === st.key ? st.week : 1).total;
+      b.innerHTML = '<span></span><small></small>';
+      b.firstChild.textContent = SESSIONS[k].title;
+      b.lastChild.textContent = fmtMin(tot);
+      b.addEventListener('click', function () { st.key = k; setUrl(); renderHome(); });
+      picker.appendChild(b);
+    });
+    $('ovTitle').textContent = S.title;
+    $('ovSub').textContent = S.subtitle || '';
+    $('ovTotal').textContent = fmtMin(plan.total);
+    $('weekRow').hidden = !S.usesWeek;
+    if (S.usesWeek) {
+      var ht = holdTimes(S, st.week);
+      $('weekVal').textContent = st.week;
+      $('weekHold').textContent = ht.hold + ' s hold / ' + ht.relax + ' s relax';
+    }
+    var list = $('ovList');
+    list.innerHTML = '';
+    plan.overview.forEach(function (o) {
+      var li = document.createElement('li');
+      if (o.header) {
+        li.className = 'sec';
+        li.textContent = o.title + (o.seconds ? ' · ' + fmtMin(o.seconds) : '');
+      } else {
+        var left = document.createElement('div');
+        var t = document.createElement('div'); t.className = 't'; t.textContent = o.title;
+        if (o.optional) { var tag = document.createElement('span'); tag.className = 'opt'; tag.textContent = 'optional'; t.appendChild(tag); }
+        var d = document.createElement('div'); d.className = 'd'; d.textContent = o.detail;
+        left.appendChild(t); left.appendChild(d); li.appendChild(left);
+        if (o.seconds) { var sp = document.createElement('span'); sp.className = 's'; sp.textContent = fmtMin(o.seconds); li.appendChild(sp); }
+        if (o.muted) t.style.color = 'var(--muted)';
+      }
+      list.appendChild(li);
+    });
+    $('ovTip').hidden = !S.tip;
+    if (S.tip) $('ovTip').textContent = S.tip;
+    var canResume = st.started && !st.finished && st.plan && st.plan.key === st.key && st.plan.week === st.week;
+    $('btnStartLabel').textContent = canResume ? 'Resume' : 'Play';
+    $('btnStartOver').hidden = !canResume;
+    $('optSound').checked = prefs.sound;
+    $('optVoice').checked = prefs.voice;
+    var last = LS.get('lastSummary', null);
+    $('lastBox').hidden = !(S.logReps && last && last.text);
+    if (S.logReps && last && last.text) {
+      $('lastText').textContent = last.text;
+      $('lastDate').textContent = new Date(last.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+    }
+  }
+
+  /* ---------- summary ---------- */
+  function summaryText() {
+    var S = SESSIONS[st.key];
+    var date = new Date().toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    var lines = [S.title + (S.subtitle ? ' (' + S.subtitle.split(' · ')[0] + ')' : '') + ' · ' + date, 'Time: ' + fmt(st.realSec), ''];
+    var rounds = {};
+    st.steps.forEach(function (s) {
+      if (!s.log) return;
+      (rounds[s.round] = rounds[s.round] || []).push(s);
+    });
+    Object.keys(rounds).forEach(function (r) {
+      var parts = rounds[r].map(function (s) {
+        var lg = st.logs[s.logKey], v = lg && lg.value !== '' && lg.value != null ? lg.value : '–';
+        return s.name + ' ' + v + (s.log === 'time' && v !== '–' ? ' s' : '');
+      });
+      lines.push('Round ' + r + ': ' + parts.join(', '));
+    });
+    // completion of non-logged sections
+    var secs = {};
+    st.steps.forEach(function (s) {
+      if (s.log || s.isRest) return;
+      var k = s.sectionKey;
+      secs[k] = secs[k] || { done: 0, total: 0 };
+      secs[k].total++; if (st.completed[s.index]) secs[k].done++;
+    });
+    var extra = Object.keys(secs).filter(function (k) { return !rounds[k]; }).map(function (k) { return k + ': ' + secs[k].done + '/' + secs[k].total + ' done'; });
+    if (extra.length) { lines.push(''); extra.forEach(function (e) { lines.push(e); }); }
+    return lines.join('\n');
+  }
+  function renderDone() {
+    var S = SESSIONS[st.key];
+    $('dTime').textContent = S.title + ' · ' + fmt(st.realSec) + ' total';
+    $('dLogBox').hidden = !S.logReps;
+    $('copyMsg').textContent = '';
+    if (!S.logReps) return;
+    var box = $('dLog');
+    box.innerHTML = '';
+    var byRound = {};
+    st.steps.forEach(function (s) { if (s.log) (byRound[s.round] = byRound[s.round] || []).push(s); });
+    Object.keys(byRound).forEach(function (r) {
+      var wrap = document.createElement('div'); wrap.className = 'log-round';
+      var h = document.createElement('h4'); h.textContent = 'Round ' + r; wrap.appendChild(h);
+      byRound[r].forEach(function (s) {
+        var row = document.createElement('label'); row.className = 'log-row';
+        var name = document.createElement('span'); name.textContent = s.name;
+        var right = document.createElement('span');
+        var inp = document.createElement('input');
+        inp.type = 'number'; inp.inputMode = 'numeric'; inp.min = '0'; inp.placeholder = '–';
+        var lg = st.logs[s.logKey];
+        inp.value = lg && lg.value !== '' && lg.value != null ? lg.value : '';
+        inp.addEventListener('input', function () {
+          var v = inp.value.trim();
+          st.logs[s.logKey] = { name: s.name, round: s.round, value: v === '' ? '' : Math.max(0, parseInt(v, 10) || 0), unit: s.log === 'time' ? 's' : 'reps' };
+          updateSummary();
+        });
+        var unit = document.createElement('span'); unit.className = 'unit'; unit.textContent = s.log === 'time' ? 'sec' : 'reps';
+        right.appendChild(inp); right.appendChild(unit);
+        row.appendChild(name); row.appendChild(right);
+        wrap.appendChild(row);
+      });
+      box.appendChild(wrap);
+    });
+    updateSummary();
+  }
+  function updateSummary() {
+    var text = summaryText();
+    $('dText').textContent = text;
+    LS.set('lastSummary', { text: text, date: new Date().toISOString(), session: st.key });
+  }
+  function copyText(text, msgEl) {
+    function ok() { if (msgEl) { msgEl.textContent = 'Copied! Paste it to your coach.'; } }
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, text.length);
+      var done = false; try { done = document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta);
+      if (msgEl) msgEl.textContent = done ? 'Copied! Paste it to your coach.' : 'Copy blocked – select the text above and copy it manually.';
+    }
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(ok, fallback);
+    else fallback();
+  }
+
+  /* ---------- toggles ---------- */
+  var ICONS = {
+    soundOn: '<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a4 4 0 010 6M18.5 6.5a7.5 7.5 0 010 11"/></svg>',
+    soundOff: '<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l5 6M22 9l-5 6"/></svg>',
+    voiceOn: '<svg viewBox="0 0 24 24"><path d="M4 5h16v10H9l-5 4z"/><path d="M8 10h8"/></svg>',
+    voiceOff: '<svg viewBox="0 0 24 24"><path d="M4 5h16v10H9l-5 4z"/><path d="M3 3l18 18"/></svg>'
+  };
+  function syncToggles() {
+    var s = $('pSound'), v = $('pVoice');
+    s.innerHTML = prefs.sound ? ICONS.soundOn : ICONS.soundOff;
+    v.innerHTML = prefs.voice ? ICONS.voiceOn : ICONS.voiceOff;
+    s.classList.toggle('off', !prefs.sound); v.classList.toggle('off', !prefs.voice);
+    s.setAttribute('aria-pressed', String(prefs.sound)); v.setAttribute('aria-pressed', String(prefs.voice));
+    s.title = 'Sound ' + (prefs.sound ? 'on' : 'off'); v.title = 'Voice ' + (prefs.voice ? 'on' : 'off');
+    $('optSound').checked = prefs.sound; $('optVoice').checked = prefs.voice;
+  }
+  function setPref(k, val) {
+    prefs[k] = val; LS.set(k, val);
+    if (k === 'voice' && !val) Voice.stop();
+    if (k === 'sound' && val) Sound.unlock();
+    syncToggles();
+  }
+
+  /* ---------- events ---------- */
+  function on(id, ev, fn) { $(id).addEventListener(ev, fn); }
+  on('btnStart', 'click', function () { startSession(false); });
+  on('btnStartOver', 'click', function () { startSession(true); });
+  on('btnPlay', 'click', function () { if (st.running) pause(); else resume(); });
+  on('btnBack', 'click', function () { Voice.stop(); goTo(st.i - 1); });
+  on('btnFwd', 'click', function () {
+    Voice.stop(); recordLeaving(false);
+    if (st.i + 1 >= st.steps.length) finish(); else goTo(st.i + 1);
+  });
+  on('btnDone', 'click', function () {
+    var step = cur(); if (!step || step.kind !== 'reps') return;
+    saveReps(step); st.completed[step.index] = true;
+    $('repsInput').blur();
+    Sound.play('set');
+    if (!st.running) resume();
+    if (st.i + 1 >= st.steps.length) finish(); else goTo(st.i + 1);
+  });
+  on('repsInput', 'keydown', function (e) { if (e.key === 'Enter') $('btnDone').click(); });
+  on('btnSkipGroup', 'click', function () {
+    var g = cur().optional, j = st.i;
+    while (j < st.steps.length && st.steps[j].optional === g) j++;
+    Voice.stop();
+    if (j >= st.steps.length) finish(); else goTo(j);
+  });
+  on('btnRestart', 'click', function () {
+    if (!confirm('Restart this session from the beginning?')) return;
+    Voice.stop(); startSession(true);
+  });
+  on('btnHome', 'click', function () { pause(); showScreen('home'); });
+  on('btnAgain', 'click', function () { showScreen('home'); });
+  on('btnCopy', 'click', function () { copyText($('dText').textContent, $('copyMsg')); });
+  on('btnCopyLast', 'click', function () {
+    var b = $('btnCopyLast'); copyText($('lastText').textContent, null);
+    b.textContent = 'Copied!'; setTimeout(function () { b.textContent = 'Copy summary'; }, 1800);
+  });
+  on('pSound', 'click', function () { setPref('sound', !prefs.sound); });
+  on('pVoice', 'click', function () { setPref('voice', !prefs.voice); });
+  on('optSound', 'change', function (e) { setPref('sound', e.target.checked); });
+  on('optVoice', 'change', function (e) { setPref('voice', e.target.checked); });
+  on('weekMinus', 'click', function () { st.week = Math.max(1, st.week - 1); setUrl(); renderHome(); });
+  on('weekPlus', 'click', function () { st.week = Math.min(12, st.week + 1); setUrl(); renderHome(); });
+  document.addEventListener('keydown', function (e) {
+    if ($('player').hidden || /INPUT|TEXTAREA/.test(document.activeElement && document.activeElement.tagName)) return;
+    if (e.key === ' ') { e.preventDefault(); $('btnPlay').click(); }
+    else if (e.key === 'ArrowRight') $('btnFwd').click();
+    else if (e.key === 'ArrowLeft') $('btnBack').click();
+  });
+
+  /* ---------- init ---------- */
+  var sParam = qs.get('s');
+  st.key = SESSIONS[sParam] ? sParam : Object.keys(SESSIONS)[0];
+  st.week = Math.min(12, Math.max(1, parseInt(qs.get('w'), 10) || 1));
+  mountCues();
+  syncToggles();
+  showScreen('home');
+
+  // debug/test hook
+  window.__coach = { st: st, build: build, speed: SPEED, summary: summaryText };
+})();
+</script>
+</body>
+</html>

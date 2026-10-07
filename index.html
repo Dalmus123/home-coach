@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f17">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Coach">
+<meta name="robots" content="noindex">
+<title>Home Coach</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0f17'/%3E%3Ccircle cx='32' cy='32' r='20' fill='none' stroke='%235eead4' stroke-width='7'/%3E%3Cpath d='M27 22l14 10-14 10z' fill='%235eead4'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main id="app">
+
+  <!-- HOME / OVERVIEW -->
+  <section id="home" class="screen">
+    <header class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <div>
+        <div class="brand-name">Home Coach</div>
+        <div class="brand-sub">Guided sessions, hands-free</div>
+      </div>
+    </header>
+
+    <nav class="picker" id="picker" aria-label="Choose a session"></nav>
+
+    <div class="overview card">
+      <div class="ov-head">
+        <div>
+          <h1 id="ovTitle">Session</h1>
+          <p class="muted" id="ovSub"></p>
+        </div>
+        <div class="ov-total" id="ovTotal"></div>
+      </div>
+      <div class="week" id="weekRow" hidden>
+        <span class="week-label">Week</span>
+        <button class="icon-btn small" id="weekMinus" aria-label="Previous week">−</button>
+        <span class="week-val" id="weekVal">1</span>
+        <button class="icon-btn small" id="weekPlus" aria-label="Next week">+</button>
+        <span class="muted week-hold" id="weekHold"></span>
+      </div>
+      <ol class="ov-list" id="ovList"></ol>
+      <p class="tip" id="ovTip" hidden></p>
+    </div>
+
+    <div class="toggles">
+      <label class="switch"><input type="checkbox" id="optSound"><span class="slider"></span><span>Sound cues</span></label>
+      <label class="switch"><input type="checkbox" id="optVoice"><span class="slider"></span><span>Voice cues</span></label>
+    </div>
+
+    <button class="cta" id="btnStart"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg><span id="btnStartLabel">Play</span></button>
+    <button class="link-btn" id="btnStartOver" hidden>Start over from the beginning</button>
+
+    <div class="card last" id="lastBox" hidden>
+      <div class="last-head"><strong>Last logged workout</strong><span class="muted" id="lastDate"></span></div>
+      <pre id="lastText"></pre>
+      <button class="ghost" id="btnCopyLast">Copy summary</button>
+    </div>
+    <p class="foot muted">Tip: turn your volume up. The screen stays awake while a session plays (where supported).</p>
+  </section>
+
+  <!-- PLAYER -->
+  <section id="player" class="screen" hidden>
+    <header class="topbar">
+      <button class="icon-btn" id="btnHome" aria-label="Back to overview"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <div class="top-title" id="pTitle"></div>
+      <button class="icon-btn tog" id="btnRestart" aria-label="Restart session" title="Restart session"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.6-5.9"/><path d="M4 4v5h5"/></svg></button>
+      <button class="icon-btn tog" id="pSound" aria-label="Toggle sound"></button>
+      <button class="icon-btn tog" id="pVoice" aria-label="Toggle voice"></button>
+    </header>
+
+    <div class="progress">
+      <div class="bar"><div class="fill" id="pBar"></div></div>
+      <div class="progress-meta"><span id="pCount"></span><span id="pEta"></span></div>
+    </div>
+
+    <div class="now">
+      <div class="section-name" id="pSection"></div>
+      <h2 class="ex-name" id="pName"></h2>
+      <div class="ex-meta" id="pMeta"></div>
+    </div>
+
+    <div class="stage" id="stage">
+      <svg id="cueSvg" viewBox="0 0 200 200" aria-hidden="true"></svg>
+      <svg id="figSvg" viewBox="0 0 200 140" aria-hidden="true"></svg>
+    </div>
+
+    <div class="clock" id="pClock">0</div>
+    <div class="phase" id="pPhase"></div>
+    <p class="instr" id="pInstr"></p>
+
+    <div class="reps-panel" id="repsPanel" hidden>
+      <label class="reps-input"><span>Reps done <em>(optional)</em></span>
+        <input type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="999" id="repsInput" placeholder="–"></label>
+      <button class="done-btn" id="btnDone">Done <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </div>
+
+    <button class="skip-group" id="btnSkipGroup" hidden></button>
+
+    <div class="next card"><span class="next-label">Up next</span><span class="next-val" id="pNext"></span></div>
+
+    <div class="controls">
+      <button class="ctl" id="btnBack" aria-label="Previous step"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+      <button class="ctl play" id="btnPlay" aria-label="Play or pause"><svg viewBox="0 0 24 24" id="playIcon"><path d="M8 5v14l11-7z"/></svg></button>
+      <button class="ctl" id="btnFwd" aria-label="Next step"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
+    </div>
+    <p class="tip" id="pTip" hidden></p>
+  </section>
+
+  <!-- DONE -->
+  <section id="done" class="screen" hidden>
+    <div class="done-hero">
+      <div class="done-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <h1>Session complete</h1>
+      <p class="muted" id="dTime"></p>
+    </div>
+    <div class="card" id="dLogBox" hidden>
+      <h3>Your log</h3>
+      <p class="muted small">Edit any number before copying.</p>
+      <div id="dLog"></div>
+      <pre id="dText"></pre>
+      <button class="cta" id="btnCopy">Copy summary</button>
+      <p class="muted small center" id="copyMsg" aria-live="polite"></p>
+    </div>
+    <button class="ghost wide" id="btnAgain">Back to sessions</button>
+  </section>
+</main>
+<script src="sessions.js"></script>
+<script src="figures.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
