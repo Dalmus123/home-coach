@@ -12,7 +12,10 @@
     get: function (k, d) { try { var v = localStorage.getItem('coach.' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
     set: function (k, v) { try { localStorage.setItem('coach.' + k, JSON.stringify(v)); } catch (e) { /* private mode */ } }
   };
-  var prefs = { sound: LS.get('sound', true), voice: LS.get('voice', true) };
+  var prefs = { sound: LS.get('sound', true), voice: LS.get('voice', true), voiceQuiet: LS.get('voiceQuiet', false) };
+  // Quiet sessions (e.g. recall, used in a shared office) stay silent unless voice is also switched on for them.
+  function isQuiet() { var S = st && st.key && SESSIONS[st.key]; return !!(S && S.quiet); }
+  function voiceOn() { return prefs.voice && (!isQuiet() || prefs.voiceQuiet); }
 
   /* ---------- helpers ---------- */
   function fmt(sec) {
@@ -68,6 +71,7 @@
           case 'in': T(392, 0.5, { slide: 523, vol: 0.1 }); break;                  // soft breathe in
           case 'out': T(494, 0.7, { slide: 330, vol: 0.08 }); break;                // soft breathe out
           case 'set': [523, 659, 784].forEach(function (f, i) { T(f, 0.25, { at: i * 0.12, vol: 0.22 }); }); break;
+          case 'chime': T(784, 1.6, { vol: 0.07 }); T(1175, 1.2, { at: 0.03, vol: 0.025 }); break; // soft bell (quiet sessions)
           case 'done': [523, 659, 784, 1047].forEach(function (f, i) { T(f, 0.35, { at: i * 0.14, vol: 0.22 }); }); break;
         }
       } catch (e) { /* ignore */ }
@@ -86,13 +90,14 @@
         en.find(function (v) { return v.localService; }) || en[0] || null;
     },
     say: function (text, interrupt) {
-      if (!this.ok || !prefs.voice || !text) return;
+      if (!this.ok || !voiceOn() || !text) return;
       try {
         if (interrupt) speechSynthesis.cancel();
         var u = new SpeechSynthesisUtterance(text);
         if (!this.voice) this.pick();
         if (this.voice) { u.voice = this.voice; u.lang = this.voice.lang; } else u.lang = 'en-US';
-        u.rate = 1; u.pitch = 1; u.volume = 1;
+        var q = isQuiet();
+        u.rate = q ? 0.92 : 1; u.pitch = 1; u.volume = q ? 0.35 : 1;
         speechSynthesis.speak(u);
       } catch (e) { /* ignore */ }
     },
@@ -134,8 +139,26 @@
     return s;
   }
 
-  function build(key, week) {
+  /* recall prompts: time of day (device clock) + rotating variants */
+  function dayKey(d) { return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+  function hhmm(d) { return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+  function recallContext(now) {
+    now = now || new Date();
+    var since = now.getHours() < 14 ? 'this morning' : 'lunch', last = LS.get('recallLast', null);
+    if (last) { var ld = new Date(last); if (dayKey(ld) === dayKey(now) && ld < now) since = 'your last break (' + hhmm(ld) + ')'; }
+    return { period: now.getHours() < 12 ? 'morning' : 'afternoon', since: since, rot: LS.get('recallRot', 0) | 0 };
+  }
+  function pickPrompt(b, c) {
+    var list = b.prompts;
+    if (!list) return b.instruction || '';
+    if (!Array.isArray(list)) list = list[c.period] || list.morning || [];
+    if (!list.length) return b.instruction || '';
+    return String(list[((c.rot % list.length) + list.length) % list.length]).replace(/\{since\}/g, c.since);
+  }
+
+  function build(key, week, rctx) {
     var S = SESSIONS[key], steps = [], overview = [];
+    var nPrompts = S.blocks.filter(function (b) { return b.type === 'reflect' && !b.settle; }).length, promptNo = 0;
     var ready = S.readySeconds || 0, lastSection = null, lastOvHeader = null, seenOptional = {};
     function add(step, b) {
       step.section = step.section || b.section || b.optional || '';
@@ -221,6 +244,19 @@
           add({ kind: 'timed', name: b.name, anim: b.anim || 'figure', figure: b.figure, instruction: b.instruction, phases: phases }, b);
           header(b);
           overview.push({ title: b.name, detail: b.seconds + ' s', from: first, optional: b.optional });
+          break;
+        }
+        case 'reflect': {
+          var rc = rctx || recallContext();
+          var text = b.settle ? b.instruction : pickPrompt(b, rc);
+          if (!b.settle) promptNo++;
+          phases = [{ type: b.settle ? 'settle' : 'reflect', dur: b.seconds, label: b.label || 'Recall', tone: 'chime', interrupt: true,
+            say: b.settle ? b.name + '. ' + b.instruction : text }];
+          add({ kind: 'timed', name: b.name, anim: 'glow', instruction: text, settle: !!b.settle,
+            prompt: b.settle ? null : promptNo, prompts: nPrompts, phases: phases }, b);
+          header(b);
+          // prompts stay hidden on the overview so they feel fresh during the session
+          overview.push({ title: b.name, detail: b.settle ? 'Slow breathing, eyes off the screen' : b.label || '', from: first, optional: b.optional });
           break;
         }
         case 'circuit': {
@@ -423,24 +459,32 @@
       setText($('pTitle'), SESSIONS[st.key].short || SESSIONS[st.key].title);
       var tip = SESSIONS[st.key].tip;
       $('pTip').hidden = !tip; if (tip) $('pTip').textContent = tip;
+      $('player').classList.toggle('calm', !!SESSIONS[st.key].quiet);
       st.running = true; st.last = performance.now();
       goTo(0);
     }
+    placeNotes('player');
     resume();
   }
   function finish() {
     st.running = false; st.finished = true;
     lockOff();
-    Sound.play('done');
-    Voice.say('Session complete. Nice work.', false);
+    var S = SESSIONS[st.key];
+    Sound.play(S.quiet ? 'chime' : 'done');
+    Voice.say(S.doneSay || 'Session complete. Nice work.', false);
+    if (S.blocks.some(function (b) { return b.type === 'reflect'; })) {
+      LS.set('recallLast', new Date().toISOString());     // next afternoon run asks "since your last break (hh:mm)"
+      LS.set('recallRot', (LS.get('recallRot', 0) | 0) + 1); // rotate prompt variants
+    }
     renderDone();
+    placeNotes('done');
     showScreen('done');
   }
 
   /* ---------- player rendering ---------- */
   var COLORS = {
     squeeze: '--warm', flick: '--warm', switch: '--warm', relax: '--cool', flickrel: '--cool', restRep: '--cool',
-    rest: '--cool', exhale: '--cool', release: '--soft', inhale: '--accent', work: '--accent', ready: '--text', reps: '--go'
+    rest: '--cool', exhale: '--cool', release: '--soft', settle: '--cool', reflect: '--soft', inhale: '--accent', work: '--accent', ready: '--text', reps: '--go'
   };
   var lastColor = null;
   function setPhaseColor(type) {
@@ -467,6 +511,8 @@
     else if (step.sets && ph && ph.type === 'ready') { var rr = step.phases[1] && step.phases[1].reps; if (rr) bits.push(rr + ' reps'); }
     if (ph && ph.side) bits.push(ph.side === 'left' ? 'Left side' : 'Right side');
     if (step.kind === 'reps') bits.push('Target ' + step.target);
+    if (step.prompt) bits.push('Prompt ' + step.prompt + ' of ' + step.prompts);
+    if (step.settle) bits.push('Eyes off the screen');
     if (step.isRest && !step.isTransition && step.round) bits.push('Round ' + step.round + ' of ' + step.rounds);
     return bits.join(' · ');
   }
@@ -511,7 +557,9 @@
   }
 
   /* ---------- cue animations (SVG, driven by the timer) ---------- */
-  var NS = 'http://www.w3.org/2000/svg', C = 2 * Math.PI * 80, cue = {};
+  var NS = 'http://www.w3.org/2000/svg', C = 2 * Math.PI * 80, CG = 2 * Math.PI * 84, cue = {};
+  var reduceMotion = false;
+  try { reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
   function mk(tag, attrs, parent) {
     var e = document.createElementNS(NS, tag);
     for (var k in attrs) e.setAttribute(k, attrs[k]);
@@ -548,6 +596,16 @@
     mk('path', { d: 'M36 120 Q100 66 164 120 Q100 174 36 120 Z', class: 'eye-white' }, cue.eyes);
     cue.iris = mk('circle', { cx: 100, cy: 120, r: 22, class: 'eye-iris' }, cue.eyes);
     cue.pupil = mk('circle', { cx: 100, cy: 120, r: 9, class: 'eye-pupil' }, cue.eyes);
+    // calm glow (recall): slow breathing core + thin step-progress ring
+    var gg = mk('radialGradient', { id: 'gGlow' }, defs);
+    mk('stop', { offset: '0%', 'stop-color': '#c4b5fd', 'stop-opacity': '0.6' }, gg);
+    mk('stop', { offset: '100%', 'stop-color': '#6366f1', 'stop-opacity': '0.06' }, gg);
+    cue.glow = mk('g', {}, svg);
+    mk('circle', { cx: 100, cy: 100, r: 84, class: 'glow-track' }, cue.glow);
+    cue.glowArc = mk('circle', { cx: 100, cy: 100, r: 84, class: 'glow-arc', transform: 'rotate(-90 100 100)', 'stroke-dasharray': CG.toFixed(1), 'stroke-dashoffset': CG.toFixed(1) }, cue.glow);
+    cue.glowCore = mk('circle', { cx: 100, cy: 100, r: 50, class: 'glow-core' }, cue.glow);
+    cue.glowText = mk('text', { x: 100, y: 97, class: 'cue-text' }, cue.glow);
+    cue.glowSub = mk('text', { x: 100, y: 121, class: 'cue-sub' }, cue.glow);
     Figures.mount($('figSvg'));
   }
   var shownCue = null;
@@ -558,7 +616,7 @@
     $('stage').classList.toggle('fig', isFig);
     $('cueSvg').style.display = isFig ? 'none' : '';
     $('figSvg').style.display = isFig ? '' : 'none';
-    ['ring', 'breath', 'pulse', 'ripple', 'eyes'].forEach(function (k) {
+    ['ring', 'breath', 'pulse', 'ripple', 'eyes', 'glow'].forEach(function (k) {
       cue[k].style.display = (k === name || (k === 'ring' && name === 'rest')) ? '' : 'none';
     });
   }
@@ -601,6 +659,13 @@
         else c.style.opacity = '0';
       });
       cue.rippleCore.setAttribute('r', (releasing ? 28 + 8 * ease(t) : ph.type === 'restRep' ? 36 - 8 * ease(t) : 28).toFixed(1));
+    } else if (anim === 'glow') {
+      var cyc = (st.se % 10) / 10;                              // 4 s in, 6 s out
+      var k = cyc < 0.4 ? ease(cyc / 0.4) : 1 - ease((cyc - 0.4) / 0.6);
+      cue.glowCore.setAttribute('r', (reduceMotion ? 52 : 40 + 22 * k).toFixed(1));
+      cue.glowArc.setAttribute('stroke-dashoffset', (CG * (1 - t)).toFixed(1));
+      setText(cue.glowText, step.settle ? (cyc < 0.4 ? 'Breathe in' : 'Breathe out') : 'Recall');
+      setText(cue.glowSub, step.prompt ? step.prompt + ' / ' + step.prompts : '');
     } else if (anim === 'eyes') {
       var x = 100 + 16 * Math.sin(2 * Math.PI * st.se / 7);
       cue.iris.setAttribute('cx', x.toFixed(1)); cue.pupil.setAttribute('cx', x.toFixed(1));
@@ -673,14 +738,63 @@
     var canResume = st.started && !st.finished && st.plan && st.plan.key === st.key && st.plan.week === st.week;
     $('btnStartLabel').textContent = canResume ? 'Resume' : 'Play';
     $('btnStartOver').hidden = !canResume;
-    $('optSound').checked = prefs.sound;
-    $('optVoice').checked = prefs.voice;
+    syncToggles();
+    $('homeFoot').textContent = S.foot || DEFAULT_FOOT;
+    placeNotes('home');
     var last = LS.get('lastSummary', null);
     $('lastBox').hidden = !(S.logReps && last && last.text);
     if (S.logReps && last && last.text) {
       $('lastText').textContent = last.text;
       $('lastDate').textContent = new Date(last.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
     }
+  }
+
+  var DEFAULT_FOOT = $('homeFoot').textContent;
+
+  /* ---------- notes (on-device only: localStorage 'coach.recallNotes') ---------- */
+  function notesAll() { var a = LS.get('recallNotes', []); return Array.isArray(a) ? a : []; }
+  function notesToday() {
+    var k = dayKey(new Date());
+    return notesAll().filter(function (n) { return n && n.t && dayKey(new Date(n.t)) === k; });
+  }
+  function addNote(text) {
+    text = String(text || '').trim();
+    if (!text) return false;
+    var a = notesAll();
+    a.push({ t: new Date().toISOString(), text: text.slice(0, 500), s: st.key });
+    if (a.length > 1000) a = a.slice(-1000);
+    LS.set('recallNotes', a);
+    renderNotes();
+    return true;
+  }
+  function deleteNote(t) { LS.set('recallNotes', notesAll().filter(function (n) { return n.t !== t; })); renderNotes(); }
+  function notesText() {
+    var date = new Date().toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    return ['Recall notes · ' + date].concat(notesToday().map(function (n) { return hhmm(new Date(n.t)) + '  ' + n.text; })).join('\n');
+  }
+  function renderNotes() {
+    var today = notesToday(), list = $('notesList');
+    list.innerHTML = '';
+    today.forEach(function (n) {
+      var li = document.createElement('li');
+      var tm = document.createElement('span'); tm.className = 'nt'; tm.textContent = hhmm(new Date(n.t));
+      var tx = document.createElement('span'); tx.className = 'nx'; tx.textContent = n.text;
+      var del = document.createElement('button'); del.type = 'button'; del.className = 'nd'; del.textContent = '×';
+      del.setAttribute('aria-label', 'Delete note'); del.dataset.t = n.t;
+      li.appendChild(tm); li.appendChild(tx); li.appendChild(del); list.appendChild(li);
+    });
+    $('notesEmpty').hidden = today.length > 0;
+    $('notesCopy').disabled = !today.length;
+    setText($('notesCount'), today.length ? today.length + ' saved today · last: ' + today[today.length - 1].text : 'Saved on this device only · shown at the end');
+  }
+  function placeNotes(where) { // 'home' | 'player' | 'done'
+    var box = $('notesBox'), S = SESSIONS[st.key];
+    if (!S || !S.notes) { box.hidden = true; return; }
+    $({ home: 'notesHome', player: 'notesPlayer', done: 'notesDone' }[where]).appendChild(box);
+    box.classList.toggle('compact', where === 'player');
+    $('notesMsg').textContent = '';
+    box.hidden = false;
+    renderNotes();
   }
 
   /* ---------- summary ---------- */
@@ -714,6 +828,7 @@
   }
   function renderDone() {
     var S = SESSIONS[st.key];
+    $('dTitle').textContent = S.doneTitle || 'Session complete';
     $('dTime').textContent = S.title + ' · ' + fmt(st.realSec) + ' total';
     $('dLogBox').hidden = !S.logReps;
     $('copyMsg').textContent = '';
@@ -752,15 +867,16 @@
     $('dText').textContent = text;
     LS.set('lastSummary', { text: text, date: new Date().toISOString(), session: st.key });
   }
-  function copyText(text, msgEl) {
-    function ok() { if (msgEl) { msgEl.textContent = 'Copied! Paste it to your coach.'; } }
+  function copyText(text, msgEl, okMsg) {
+    okMsg = okMsg || 'Copied! Paste it to your coach.';
+    function ok() { if (msgEl) { msgEl.textContent = okMsg; } }
     function fallback() {
       var ta = document.createElement('textarea');
       ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
       document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, text.length);
       var done = false; try { done = document.execCommand('copy'); } catch (e) {}
       document.body.removeChild(ta);
-      if (msgEl) msgEl.textContent = done ? 'Copied! Paste it to your coach.' : 'Copy blocked – select the text above and copy it manually.';
+      if (msgEl) msgEl.textContent = done ? okMsg : 'Copy blocked – select the text above and copy it manually.';
     }
     if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(ok, fallback);
     else fallback();
@@ -774,16 +890,20 @@
     voiceOff: '<svg viewBox="0 0 24 24"><path d="M4 5h16v10H9l-5 4z"/><path d="M3 3l18 18"/></svg>'
   };
   function syncToggles() {
-    var s = $('pSound'), v = $('pVoice');
+    var s = $('pSound'), v = $('pVoice'), vo = voiceOn();
     s.innerHTML = prefs.sound ? ICONS.soundOn : ICONS.soundOff;
-    v.innerHTML = prefs.voice ? ICONS.voiceOn : ICONS.voiceOff;
-    s.classList.toggle('off', !prefs.sound); v.classList.toggle('off', !prefs.voice);
-    s.setAttribute('aria-pressed', String(prefs.sound)); v.setAttribute('aria-pressed', String(prefs.voice));
-    s.title = 'Sound ' + (prefs.sound ? 'on' : 'off'); v.title = 'Voice ' + (prefs.voice ? 'on' : 'off');
-    $('optSound').checked = prefs.sound; $('optVoice').checked = prefs.voice;
+    v.innerHTML = vo ? ICONS.voiceOn : ICONS.voiceOff;
+    s.classList.toggle('off', !prefs.sound); v.classList.toggle('off', !vo);
+    s.setAttribute('aria-pressed', String(prefs.sound)); v.setAttribute('aria-pressed', String(vo));
+    s.title = 'Sound ' + (prefs.sound ? 'on' : 'off'); v.title = 'Voice ' + (vo ? 'on' : 'off') + (isQuiet() ? ' (quiet session)' : '');
+    $('optSound').checked = prefs.sound; $('optVoice').checked = vo;
+    $('optVoiceLabel').textContent = isQuiet() ? 'Voice (quiet)' : 'Voice cues';
   }
   function setPref(k, val) {
-    prefs[k] = val; LS.set(k, val);
+    if (k === 'voice' && isQuiet()) { // quiet session: its own switch; turning it on also enables voice globally
+      prefs.voiceQuiet = val; LS.set('voiceQuiet', val);
+      if (val && !prefs.voice) { prefs.voice = true; LS.set('voice', true); }
+    } else { prefs[k] = val; LS.set(k, val); }
     if (k === 'voice' && !val) Voice.stop();
     if (k === 'sound' && val) Sound.unlock();
     syncToggles();
@@ -825,6 +945,16 @@
     var b = $('btnCopyLast'); copyText($('lastText').textContent, null);
     b.textContent = 'Copied!'; setTimeout(function () { b.textContent = 'Copy summary'; }, 1800);
   });
+  on('noteForm', 'submit', function (e) {
+    e.preventDefault();
+    var inp = $('noteInput');
+    if (addNote(inp.value)) { inp.value = ''; $('notesMsg').textContent = ''; }
+  });
+  on('notesList', 'click', function (e) {
+    var b = e.target.closest && e.target.closest('.nd');
+    if (b && confirm('Delete this note?')) deleteNote(b.dataset.t);
+  });
+  on('notesCopy', 'click', function () { copyText(notesText(), $('notesMsg'), 'Copied today\'s notes.'); });
   on('pSound', 'click', function () { setPref('sound', !prefs.sound); });
   on('pVoice', 'click', function () { setPref('voice', !prefs.voice); });
   on('optSound', 'change', function (e) { setPref('sound', e.target.checked); });
@@ -847,5 +977,5 @@
   showScreen('home');
 
   // debug/test hook
-  window.__coach = { st: st, build: build, speed: SPEED, summary: summaryText };
+  window.__coach = { st: st, build: build, speed: SPEED, summary: summaryText, recallContext: recallContext, notesText: notesText, voiceOn: voiceOn };
 })();

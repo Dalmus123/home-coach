@@ -49,18 +49,19 @@
 
     <div class="toggles">
       <label class="switch"><input type="checkbox" id="optSound"><span class="slider"></span><span>Sound cues</span></label>
-      <label class="switch"><input type="checkbox" id="optVoice"><span class="slider"></span><span>Voice cues</span></label>
+      <label class="switch"><input type="checkbox" id="optVoice"><span class="slider"></span><span id="optVoiceLabel">Voice cues</span></label>
     </div>
 
     <button class="cta" id="btnStart"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg><span id="btnStartLabel">Play</span></button>
     <button class="link-btn" id="btnStartOver" hidden>Start over from the beginning</button>
+    <div class="slot" id="notesHome"></div>
 
     <div class="card last" id="lastBox" hidden>
       <div class="last-head"><strong>Last logged workout</strong><span class="muted" id="lastDate"></span></div>
       <pre id="lastText"></pre>
       <button class="ghost" id="btnCopyLast">Copy summary</button>
     </div>
-    <p class="foot muted">Tip: turn your volume up. The screen stays awake while a session plays (where supported).</p>
+    <p class="foot muted" id="homeFoot">Tip: turn your volume up. The screen stays awake while a session plays (where supported).</p>
   </section>
 
   <!-- PLAYER -->
@@ -92,6 +93,7 @@
     <div class="clock" id="pClock">0</div>
     <div class="phase" id="pPhase"></div>
     <p class="instr" id="pInstr"></p>
+    <div class="slot" id="notesPlayer"></div>
 
     <div class="reps-panel" id="repsPanel" hidden>
       <label class="reps-input"><span>Reps done <em>(optional)</em></span>
@@ -115,7 +117,7 @@
   <section id="done" class="screen" hidden>
     <div class="done-hero">
       <div class="done-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <h1>Session complete</h1>
+      <h1 id="dTitle">Session complete</h1>
       <p class="muted" id="dTime"></p>
     </div>
     <div class="card" id="dLogBox" hidden>
@@ -126,8 +128,27 @@
       <button class="cta" id="btnCopy">Copy summary</button>
       <p class="muted small center" id="copyMsg" aria-live="polite"></p>
     </div>
+    <div class="slot" id="notesDone"></div>
     <button class="ghost wide" id="btnAgain">Back to sessions</button>
   </section>
+
+  <!-- NOTES (moved between the home, player and done screens by app.js; only for sessions with notes: true) -->
+  <div class="card notes" id="notesBox" hidden>
+    <div class="notes-head"><strong>Notes <span class="muted small">(optional)</span></strong><span class="muted small">Paper is fine too</span></div>
+    <form class="note-form" id="noteForm" autocomplete="off">
+      <input type="text" id="noteInput" maxlength="500" placeholder="Type a line, press Enter" enterkeyhint="done" aria-label="Note">
+      <button class="ghost" id="noteAdd" type="submit">Save</button>
+    </form>
+    <p class="muted small notes-count" id="notesCount" aria-live="polite"></p>
+    <div class="notes-full">
+      <h4 class="notes-h">Today</h4>
+      <p class="muted small" id="notesEmpty">Nothing saved yet today.</p>
+      <ul class="notes-list" id="notesList"></ul>
+      <button class="ghost wide" id="notesCopy" type="button">Copy</button>
+      <p class="muted small center" id="notesMsg" aria-live="polite"></p>
+    </div>
+    <p class="muted small notes-priv">Saved only in this browser on this device (with date and time). Nothing is sent anywhere.</p>
+  </div>
 </main>
 <script src="sessions.js"></script>
 <script src="figures.js"></script>

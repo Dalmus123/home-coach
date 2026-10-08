@@ -30,7 +30,7 @@ h1, h2, h3 { margin: 0; line-height: 1.15; }
 .logo { width: 40px; height: 40px; border-radius: 12px; background: radial-gradient(circle at 50% 50%, transparent 9px, var(--accent) 10px, var(--accent) 14px, transparent 15px), var(--surface2); }
 .brand-name { font-weight: 700; font-size: 19px; }
 .brand-sub { color: var(--muted); font-size: 14px; }
-.picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.picker { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .pick {
   background: var(--surface); border: 1.5px solid var(--line); border-radius: 14px;
   padding: 12px 8px; min-height: 64px; text-align: center; font-weight: 600; font-size: 15px; line-height: 1.2;
@@ -143,6 +143,39 @@ pre { white-space: pre-wrap; word-break: break-word; font: 13px/1.45 ui-monospac
 .fig-prop path { fill: none; stroke: #5b6a88; stroke-width: 4; stroke-linecap: round; }
 .fig-prop rect { fill: #7c8db0; }
 
+/* Recall (quiet sessions): calm glow, smaller clock, prompt as the main text */
+.glow-track { fill: none; stroke: var(--surface2); stroke-width: 3; }
+.glow-arc { fill: none; stroke: var(--phase); stroke-width: 3; stroke-linecap: round; opacity: .75; transition: stroke .6s; }
+.glow-core { fill: url(#gGlow); }
+#player.calm .clock { font-size: clamp(30px, min(11vw, 5.4dvh), 50px); color: var(--muted); font-weight: 700; }
+#player.calm .instr { color: var(--text); font-weight: 600; font-size: clamp(18px, 2.9dvh, 23px); line-height: 1.3; min-height: 2.6em; display: flex; align-items: center; justify-content: center; }
+#player.calm .tip, #player.calm .phase, #player.calm .next { display: none; }
+#player.calm .stage { width: min(52vw, 21dvh, 240px); }
+
+/* Notes (on-device) */
+.slot { display: contents; }
+.notes { display: flex; flex-direction: column; gap: 10px; }
+.notes-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.note-form { display: flex; gap: 8px; margin: 0; }
+.note-form input { flex: 1; min-width: 0; background: var(--surface2); border: 1px solid var(--line); border-radius: 12px; color: var(--text); font: inherit; font-size: 16px; padding: 10px 12px; outline: none; }
+.note-form input:focus { border-color: var(--soft); }
+.note-form .ghost { min-height: 44px; padding: 8px 14px; }
+.notes-count { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.notes-full { display: flex; flex-direction: column; gap: 6px; }
+.notes-h { margin: 4px 0 0; color: var(--soft); font-size: 13px; letter-spacing: .07em; text-transform: uppercase; }
+.notes-full > p { margin: 0; }
+.notes-list { list-style: none; margin: 0; padding: 0; }
+.notes-list li { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-top: 1px solid var(--line); }
+.notes-list li:first-child { border-top: 0; }
+.notes-list .nt { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; padding-top: 2px; flex: none; }
+.notes-list .nx { flex: 1; min-width: 0; word-break: break-word; }
+.notes-list .nd { background: none; border: 0; color: var(--muted); font-size: 20px; width: 32px; height: 32px; padding: 0; flex: none; line-height: 1; }
+.notes .ghost:disabled { opacity: .45; cursor: default; }
+.notes-priv { margin: 0; }
+.notes.compact { padding: 10px 12px; gap: 6px; }
+.notes.compact .notes-full, .notes.compact .notes-priv { display: none; }
+.notes:not(.compact) .notes-count { display: none; }
+
 /* Done */
 .done-hero { text-align: center; padding: 20px 0 6px; }
 .done-check { width: 84px; height: 84px; margin: 0 auto 14px; border-radius: 50%; background: #10302d; color: var(--accent); display: grid; place-items: center; }
@@ -163,4 +196,8 @@ pre { white-space: pre-wrap; word-break: break-word; font: 13px/1.45 ui-monospac
 @media (max-height: 640px) {
   #player .instr { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
   #player .section-name { display: none; }
+}
+@media (max-height: 640px) {
+  #player.calm .instr { display: flex; -webkit-line-clamp: unset; overflow: visible; }
+  #player.calm .notes-head { display: none; }
 }

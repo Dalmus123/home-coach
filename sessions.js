@@ -12,6 +12,13 @@
  *                 { name, reps: '15–20', est, figure, instruction }      -> rep-based, tap Done
  *                 { name, seconds, figure, log: 'time', instruction } ] } -> timed
  *   interval  : { rounds, work, transition, setup: { seconds, label }, exercises: [{ name, figure, side, instruction }] }
+ *   reflect   : { name, seconds, label, settle, instruction, prompts }   (calm 'glow' ring, soft chime, no ticks)
+ *               prompts: [variants...] or { morning: [...], afternoon: [...] } (device clock: before 12:00 = morning).
+ *               One variant is used per run and rotates each time the session is finished.
+ *               '{since}' becomes 'lunch' or 'your last break (14:05)' (time of the last recall finished today).
+ *
+ * Session flags: quiet (soft chime instead of beeps, voice off unless turned on for quiet sessions, quiet speech),
+ *   notes (shows the on-device notes box), doneTitle, doneSay, foot.
  *
  * Common optional block fields: section (group heading), optional (group name; adds a Skip button).
  * Figures available: march, armcircles, squat, pushup, row, pike, bridge, plank, crunch, kneetuck,
@@ -138,6 +145,65 @@ window.COACH_SESSIONS = {
         instruction: 'Rise onto the toes, pause, lower slowly.' },
       { type: 'timed', name: 'Eyes far away', seconds: 20, anim: 'eyes',
         instruction: 'Look at something at least 6 m (20 ft) away. Blink slowly.' },
+    ],
+  },
+
+  recall: {
+    title: 'Recall & consolidate',
+    short: 'Recall',
+    subtitle: '2-minute zone-out · eyes off the screen',
+    tip: 'Writing on paper is fine too. Notes stay on this device.',
+    quiet: true,
+    notes: true,
+    doneTitle: 'Done. Back to work.',
+    doneSay: 'Done. Back to work.',
+    foot: 'Low-stimulation pause: soft chime at each prompt, voice off unless you turn it on.',
+    blocks: [
+      { type: 'reflect', name: 'Settle', seconds: 15, settle: true, label: 'Breathe slowly',
+        instruction: 'Sit back at your desk and look away from the screen. Breathe in for 4, out for 6.' },
+      { type: 'reflect', name: 'First things', seconds: 20, label: 'Replay', prompts: {
+        morning: [
+          'Since you woke up, what happened first?',
+          'Rewind to waking up. What did you see, hear and do first?',
+          'Replay the start of today, in order. How did the morning begin?',
+        ],
+        afternoon: [
+          'Since {since}, what happened first?',
+          'Rewind to {since}. Where were you and what came next?',
+          'Replay the time since {since}, in order. What happened first?',
+        ] } },
+      { type: 'reflect', name: 'Food & people', seconds: 20, label: 'Replay', prompts: {
+        morning: [
+          'What did you eat for breakfast, and who did you talk to?',
+          'Breakfast, the commute, arriving: what did you eat and who did you see?',
+          'What did you eat or drink this morning? Who was the first person you spoke to?',
+        ],
+        afternoon: [
+          'What did you eat or drink, and who did you talk to?',
+          'Lunch and conversations: what did you eat, who did you speak with, what was said?',
+          'Who have you talked to since {since}? What did they say?',
+        ] } },
+      { type: 'reflect', name: 'Work & learning', seconds: 20, label: 'Replay', prompts: {
+        morning: [
+          'What did you work on after that? What did you learn or decide?',
+          'Walk through your tasks in order: which client, file or issue? Any decision made?',
+          'What new fact, number or idea did you come across this morning?',
+        ],
+        afternoon: [
+          'What have you worked on since {since}? What did you learn or decide?',
+          'Walk through your tasks since {since}: which client, file or issue? Any decision made?',
+          'What new fact, number or idea did you come across since {since}?',
+        ] } },
+      { type: 'reflect', name: 'What stood out', seconds: 20, label: 'Notice', prompts: [
+        'What felt important or surprising?',
+        'Was there a moment you felt stuck, pleased or annoyed? Why?',
+        'What is still unfinished, and what is the next step?',
+      ] },
+      { type: 'reflect', name: 'Keep', seconds: 25, label: 'Write it down', prompts: [
+        'Pick one or two things worth keeping and write them down.',
+        'Which one or two things do you want to remember next month? Write them down.',
+        'Choose the most useful thing so far today and note it in a few words.',
+      ] },
     ],
   },
 };
