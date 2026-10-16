@@ -260,14 +260,15 @@
           break;
         }
         case 'circuit': {
-          header(b, b.section + ' · ' + b.rounds + ' rounds');
+          var RW = b.roundWord || 'Round'; // e.g. 'Set' for a single-exercise block done as straight sets
+          header(b, b.section + ' · ' + b.rounds + ' ' + RW.toLowerCase() + 's');
           for (r = 1; r <= b.rounds; r++) {
             b.exercises.forEach(function (ex, xi) {
-              var pre = (xi === 0 ? sectionIntro(b) + 'Round ' + r + ' of ' + b.rounds + '. ' : '');
-              var base = { name: ex.name, figure: ex.figure, anim: 'figure', instruction: ex.instruction, round: r, rounds: b.rounds, logKey: 'r' + r + ':' + ex.name };
+              var pre = (xi === 0 ? sectionIntro(b) + RW + ' ' + r + ' of ' + b.rounds + '. ' : '');
+              var base = { name: ex.name, figure: ex.figure, anim: 'figure', instruction: ex.instruction, round: r, rounds: b.rounds, roundWord: RW, logKey: 'r' + r + ':' + ex.name };
               if (ex.reps) {
                 base.kind = 'reps'; base.target = ex.reps; base.est = ex.est || 40; base.log = 'reps';
-                base.say = pre + ex.name + '. ' + spoken(ex.reps) + ' reps. Tap done when finished.';
+                base.say = pre + ex.name + '. ' + spoken(ex.reps) + ' reps. ' + (ex.say && r === 1 ? ex.say + ' ' : '') + 'Tap done when finished.';
               } else {
                 base.kind = 'timed'; base.log = ex.log || null;
                 base.phases = [
@@ -277,14 +278,14 @@
               }
               add(base, b);
               var lastEx = xi === b.exercises.length - 1;
-              if (!lastEx) add(restStep(b.restBetweenExercises, 'Rest ' + b.restBetweenExercises + ' seconds.', { round: r, rounds: b.rounds }), b);
-              else if (r < b.rounds) add(restStep(b.restBetweenRounds, 'Round ' + r + ' complete. Rest ' + b.restBetweenRounds + ' seconds.', { round: r, rounds: b.rounds, name: 'Round rest' }), b);
+              if (!lastEx) add(restStep(b.restBetweenExercises, 'Rest ' + b.restBetweenExercises + ' seconds.', { round: r, rounds: b.rounds, roundWord: RW }), b);
+              else if (r < b.rounds) add(restStep(b.restBetweenRounds, RW + ' ' + r + ' complete. Rest ' + b.restBetweenRounds + ' seconds.', { round: r, rounds: b.rounds, roundWord: RW, name: RW + ' rest' }), b);
             });
           }
           b.exercises.forEach(function (ex) {
             overview.push({ title: ex.name, detail: ex.reps ? ex.reps + ' reps' : ex.seconds + ' s hold' });
           });
-          overview.push({ title: 'Rests', detail: b.restBetweenExercises + ' s between moves · ' + b.restBetweenRounds + ' s between rounds', muted: true });
+          overview.push({ title: 'Rests', detail: (b.exercises.length > 1 ? b.restBetweenExercises + ' s between moves · ' : '') + b.restBetweenRounds + ' s between ' + RW.toLowerCase() + 's', muted: true });
           break;
         }
         case 'interval': {
@@ -505,7 +506,7 @@
   }
   function metaFor(step, ph) {
     var bits = [];
-    if (step.round && !step.isRest) bits.push('Round ' + step.round + ' of ' + step.rounds);
+    if (step.round && !step.isRest) bits.push((step.roundWord || 'Round') + ' ' + step.round + ' of ' + step.rounds);
     if (step.sets > 1) bits.push('Set ' + step.set + ' of ' + step.sets);
     if (ph && ph.reps) bits.push((ph.repWord || 'Rep') + ' ' + ph.rep + ' of ' + ph.reps);
     else if (step.sets && ph && ph.type === 'ready') { var rr = step.phases[1] && step.phases[1].reps; if (rr) bits.push(rr + ' reps'); }
@@ -513,7 +514,7 @@
     if (step.kind === 'reps') bits.push('Target ' + step.target);
     if (step.prompt) bits.push('Prompt ' + step.prompt + ' of ' + step.prompts);
     if (step.settle) bits.push('Eyes off the screen');
-    if (step.isRest && !step.isTransition && step.round) bits.push('Round ' + step.round + ' of ' + step.rounds);
+    if (step.isRest && !step.isTransition && step.round) bits.push((step.roundWord || 'Round') + ' ' + step.round + ' of ' + step.rounds);
     return bits.join(' · ');
   }
   var PLAY = 'M8 5v14l11-7z', PAUSE = 'M6 5h4v14H6zM14 5h4v14h-4z';

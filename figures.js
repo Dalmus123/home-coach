@@ -58,6 +58,11 @@ window.Figures = (function () {
       A: { h: [38, 115], n: [52, 119], p: [88, 121], k1: [108, 100], f1: [124, 123], e1: [68, 122], w1: [82, 122] },
       B: { h: [38, 115], n: [52, 118], p: [86, 104], k1: [110, 98], f1: [124, 123], e1: [68, 122], w1: [82, 122] }
     },
+    rollout: {
+      period: 4, props: ['wheel'],
+      A: { h: [130, 80], n: [118, 84], p: [84, 95], k1: [80, 121], f1: [55, 123], e1: [119, 100], w1: [120, 115] },
+      B: { h: [148, 107], n: [136, 111], p: [100, 108], k1: [80, 121], f1: [55, 123], e1: [150, 114], w1: [164, 116] }
+    },
     plank: {
       period: 3,
       A: { h: [150, 95], n: [138, 100], p: [92, 110], k1: [66, 116], f1: [40, 122], e1: [138, 122], w1: [156, 122] },
@@ -162,6 +167,7 @@ window.Figures = (function () {
     props.chairLow = el('path', { d: 'M116 102 H152 M118 102 V125 M150 102 V125 M150 102 V74' }, pg);
     props.chairFront = el('path', { d: 'M76 97 H124 M80 97 V125 M120 97 V125' }, pg);
     props.bag = el('rect', { width: 12, height: 10, rx: 2 }, pg);
+    props.wheel = el('circle', { r: 5 }, pg);
     ['arm2', 'leg2'].forEach(function (k) { parts[k] = el('polyline', { class: 'fig-limb far' }, g); });
     parts.torso = el('polyline', { class: 'fig-limb' }, g);
     parts.shoulders = el('polyline', { class: 'fig-limb' }, g);
@@ -193,6 +199,10 @@ window.Figures = (function () {
     if (current.props && current.props.indexOf('bag') >= 0) {
       props.bag.setAttribute('x', (o.w1[0] - 6).toFixed(1));
       props.bag.setAttribute('y', (o.w1[1]).toFixed(1));
+    }
+    if (current.props && current.props.indexOf('wheel') >= 0) {
+      props.wheel.setAttribute('cx', o.w1[0].toFixed(1));
+      props.wheel.setAttribute('cy', '118');
     }
   }
   return { mount: mount, draw: draw, has: function (n) { return !!DEFS[n]; }, names: Object.keys(DEFS) };

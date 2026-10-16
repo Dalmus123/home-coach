@@ -9,7 +9,8 @@ Static, dependency-free guided workout player (HTML/CSS/JS, no build step, no CD
 
 ## URLs
 - `?s=pelvic&w=1`: Core & pelvic floor (week 1-2: 5 s hold, 3-4: 8 s, 5+: 10 s)
-- `?s=workout`: Home full-body, week 1
+- `?s=workout`: Home full-body, week 1 (~32 min): warm-up, 3-round circuit (push-ups optionally on the ab wheel handles),
+  ab wheel rollouts 3 × 6-8 (kneeling, 50 s rest), chair core 2 rounds
 - `?s=breaks`: 3-minute desk reset
 - `?s=recall`: Recall & consolidate, a 2-minute quiet 'zone out and recall' break (see below)
 - Debug: add `&speed=10` to run timers 10x faster.

@@ -9,7 +9,8 @@
  *   stretch   : { name, perSide, figure, optional, instruction }   (left side, switch, right side)
  *   timed     : { name, seconds, figure | anim, instruction, cues: [{ at, say }] }
  *   circuit   : { rounds, restBetweenExercises, restBetweenRounds, exercises: [
- *                 { name, reps: '15–20', est, figure, instruction }      -> rep-based, tap Done
+ *                 roundWord: 'Set' (optional; says 'Set 1 of 3' instead of 'Round 1 of 3', e.g. single-exercise straight sets)
+ *                 { name, reps: '15–20', est, figure, instruction, say }  -> rep-based, tap Done (say: extra spoken cue, round 1 only)
  *                 { name, seconds, figure, log: 'time', instruction } ] } -> timed
  *   interval  : { rounds, work, transition, setup: { seconds, label }, exercises: [{ name, figure, side, instruction }] }
  *   reflect   : { name, seconds, label, settle, instruction, prompts }   (calm 'glow' ring, soft chime, no ticks)
@@ -22,7 +23,7 @@
  *
  * Common optional block fields: section (group heading), optional (group name; adds a Skip button).
  * Figures available: march, armcircles, squat, pushup, row, pike, bridge, plank, crunch, kneetuck,
- *   legraise, sidecrunch, neckroll, shoulderroll, chestopener, hamstring, calfraise, lunge, glute.
+ *   legraise, sidecrunch, rollout (kneeling ab wheel), neckroll, shoulderroll, chestopener, hamstring, calfraise, lunge, glute.
  */
 window.COACH_SESSIONS = {
   pelvic: {
@@ -95,7 +96,8 @@ window.COACH_SESSIONS = {
         type: 'circuit', section: 'Circuit', rounds: 3, restBetweenExercises: 20, restBetweenRounds: 90,
         exercises: [
           { name: 'Push-ups', reps: '8–12', est: 40, figure: 'pushup',
-            instruction: 'Straight line from head to heels. Drop to the knees if needed.' },
+            say: 'Option: hands on the wheel handles. Keep the wheels still.',
+            instruction: 'Option: hands on wheel handles; keep wheels still (against a wall, press straight down). Straight line head to heels; knees down if needed.' },
           { name: 'Squats', reps: '15–20', est: 50, figure: 'squat',
             instruction: 'Sit back and down, chest up, drive up through the heels.' },
           { name: 'Backpack rows', reps: '10–12', est: 40, figure: 'row',
@@ -109,11 +111,18 @@ window.COACH_SESSIONS = {
         ],
       },
       {
-        type: 'interval', section: 'Chair core finisher', rounds: 2, work: 30, transition: 10,
+        type: 'circuit', section: 'Core finisher: ab wheel', roundWord: 'Set', rounds: 3,
+        restBetweenExercises: 0, restBetweenRounds: 50,
+        exercises: [
+          { name: 'Ab wheel rollouts', reps: '6–8', est: 40, figure: 'rollout',
+            say: 'Roll out only as far as your lower back stays flat. Stop if your lower back hurts.',
+            instruction: 'Start on your knees (towel under them), brace. Roll out only as far as your lower back stays flat, then pull back with your abs. Stop if any lower-back pain.' },
+        ],
+      },
+      {
+        type: 'interval', section: 'Core finisher: chair', rounds: 2, work: 30, transition: 10,
         setup: { seconds: 20, label: 'Grab a sturdy chair' },
         exercises: [
-          { name: 'Chair-supported crunch', figure: 'crunch',
-            instruction: 'Lie back with calves on the seat. Curl the shoulders up, then lower.' },
           { name: 'Seated knee tucks', figure: 'kneetuck',
             instruction: 'Sit on the front edge, hold the seat, draw the knees in and extend.' },
           { name: 'Seated leg raises', figure: 'legraise',
