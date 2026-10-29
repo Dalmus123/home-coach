@@ -8,7 +8,7 @@ Static, dependency-free guided workout player (HTML/CSS/JS, no build step, no CD
 - `tests/`: headless-Chrome checks (Playwright): `test_app.py` (all sessions), `layout.py` (player fit), `test_recall.py` (recall, assertion-based)
 
 ## URLs
-- `?s=pelvic&w=1`: Core & pelvic floor (week 1-2: 5 s hold, 3-4: 8 s, 5+: 10 s)
+- `?s=pelvic&w=1`: Core & pelvic floor (3-5 min habit loop: cue "Same time, same spot, N minutes" → session → "Done ✅ Streak +1"; week 1-2: 5 s hold, 3-4: 8 s, 5+: 10 s; grows ~30-60 s every 2 weeks, ~3:20 → ~7:20 by week 11-12; voice off by default)
 - `?s=workout`: Home full-body, week 1 (~32 min): warm-up, 3-round circuit (push-ups optionally on the ab wheel handles),
   ab wheel rollouts 3 × 6-8 (kneeling, 50 s rest), chair core 2 rounds
 - `?s=breaks`: 3-minute desk reset

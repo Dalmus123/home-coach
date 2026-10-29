@@ -1,7 +1,7 @@
 :root {
   --bg: #0b0f17; --surface: #141a26; --surface2: #1b2333; --line: #263046;
   --text: #eef2f8; --muted: #8e9ab0;
-  --accent: #5eead4; --warm: #fbbf24; --cool: #60a5fa; --soft: #a78bfa; --go: #a3e635;
+  --accent: #5eead4; --warm: #fbbf24; --cool: #60a5fa; --soft: #a78bfa; --go: #a3e635; --hold: #fb7185;
   --phase: var(--accent);
   --fig: #e6ecf5;
 }
@@ -129,6 +129,11 @@ pre { white-space: pre-wrap; word-break: break-word; font: 13px/1.45 ui-monospac
 .cue-sub { fill: var(--muted); font-size: 12px; font-weight: 600; text-anchor: middle; letter-spacing: .08em; }
 .breath-guide { fill: none; stroke: #23314a; stroke-width: 2; stroke-dasharray: 4 6; }
 .breath-core { fill: url(#gBreath); }
+.floor-core { fill: var(--phase); opacity: .9; transition: fill .25s; }
+.floor-arrow { fill: #0b0f17; }
+.floor-fill { fill: var(--phase); transition: fill .25s; }
+.floor-mid { stroke: #23314a; stroke-width: 2; stroke-dasharray: 3 5; }
+#player.tips .instr { min-height: 3.9em; line-height: 1.3; font-size: clamp(14px, 2dvh, 16px); }
 .pulse-core { fill: var(--phase); }
 .ripple-ring { fill: none; stroke: var(--soft); stroke-width: 3; }
 .ripple-core { fill: #2a2350; stroke: var(--soft); stroke-width: 2; }
@@ -195,7 +200,7 @@ pre { white-space: pre-wrap; word-break: break-word; font: 13px/1.45 ui-monospac
   .ov-head h1 { font-size: 22px; }
 }
 @media (max-height: 640px) {
-  #player .instr { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+  #player:not(.tips) .instr { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
   #player .section-name { display: none; }
 }
 @media (max-height: 640px) {

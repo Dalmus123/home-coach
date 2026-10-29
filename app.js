@@ -15,7 +15,9 @@
   var prefs = { sound: LS.get('sound', true), voice: LS.get('voice', true), voiceQuiet: LS.get('voiceQuiet', false) };
   // Quiet sessions (e.g. recall, used in a shared office) stay silent unless voice is also switched on for them.
   function isQuiet() { var S = st && st.key && SESSIONS[st.key]; return !!(S && S.quiet); }
-  function voiceOn() { return prefs.voice && (!isQuiet() || prefs.voiceQuiet); }
+  // Sessions flagged voiceDefaultOff (pelvic) are silent until voice is switched on for them, like quiet ones.
+  function voiceOptIn() { var S = st && st.key && SESSIONS[st.key]; return !!(S && (S.quiet || S.voiceDefaultOff)); }
+  function voiceOn() { return prefs.voice && (!voiceOptIn() || prefs.voiceQuiet); }
 
   /* ---------- helpers ---------- */
   function fmt(sec) {
@@ -129,6 +131,10 @@
     for (var i = 0; i < rows.length; i++) if (week <= rows[i].maxWeek) return rows[i];
     return { hold: 5, relax: 5 };
   }
+  function wv(b, field, row) { // block value, overridden by the holdByWeek row key named in b.weekKeys[field]
+    var k = b.weekKeys && b.weekKeys[field];
+    return k && row[k] != null ? row[k] : b[field];
+  }
   function restStep(seconds, say, extra) {
     var s = {
       kind: 'timed', name: 'Rest', anim: 'rest', isRest: true, sayNext: true,
@@ -154,6 +160,25 @@
     if (!Array.isArray(list)) list = list[c.period] || list.morning || [];
     if (!list.length) return b.instruction || '';
     return String(list[((c.rot % list.length) + list.length) % list.length]).replace(/\{since\}/g, c.since);
+  }
+
+  /* habit cue: 'Same time, same spot, 4 minutes' (the minutes follow this week's total) */
+  function cueText(S, totalSec) {
+    return S.cue ? S.cue.replace(/\{min\}/g, String(Math.max(1, Math.round(totalSec / 60)))) : '';
+  }
+
+  /* streak (localStorage 'coach.streak' = { count, last: local day key, best }); counts one per day, consecutive days */
+  function streakNow(now) { // the streak still alive today (0 if the last day done was before yesterday)
+    var d = LS.get('streak', null), y = new Date(now); y.setDate(y.getDate() - 1);
+    return d && (d.last === dayKey(now) || d.last === dayKey(y)) ? (d.count | 0) : 0;
+  }
+  function streakBump(now) { // -> { count, added }
+    now = now || new Date();
+    var d = LS.get('streak', null) || { count: 0, last: null, best: 0 };
+    if (d.last === dayKey(now)) return { count: d.count | 0, added: false };
+    d.count = streakNow(now) + 1; d.last = dayKey(now); d.best = Math.max(d.best | 0, d.count);
+    LS.set('streak', d);
+    return { count: d.count, added: true };
   }
 
   function build(key, week, rctx) {
@@ -182,11 +207,11 @@
       var first = steps.length, r, s, i, phases;
       switch (b.type) {
         case 'breathing': {
-          var n = Math.max(1, Math.round(b.seconds / (b.inhale + b.exhale)));
-          phases = [{ type: 'ready', dur: 6, label: 'Get comfortable', say: sectionIntro(b) + b.name + '. ' + b.instruction }];
+          var n = Math.max(1, Math.round(wv(b, 'seconds', holdTimes(S, week)) / (b.inhale + b.exhale)));
+          phases = [{ type: 'ready', dur: 6, label: 'Get comfortable', say: sectionIntro(b) + b.name + '. ' + b.instruction, tip: (b.tips || {}).ready }];
           for (i = 1; i <= n; i++) {
-            phases.push({ type: 'inhale', dur: b.inhale, label: 'Breathe in', say: 'Breathe in', tone: 'in', rep: i, reps: n, repWord: 'Breath' });
-            phases.push({ type: 'exhale', dur: b.exhale, label: 'Breathe out', say: 'Breathe out', tone: 'out', rep: i, reps: n, repWord: 'Breath' });
+            phases.push({ type: 'inhale', dur: b.inhale, label: 'Breathe in', say: 'Breathe in', tone: 'in', rep: i, reps: n, repWord: 'Breath', tip: (b.tips || {}).inhale });
+            phases.push({ type: 'exhale', dur: b.exhale, label: 'Breathe out', say: 'Breathe out', tone: 'out', rep: i, reps: n, repWord: 'Breath', tip: (b.tips || {}).exhale });
           }
           add({ kind: 'timed', name: b.name, anim: 'breathe', instruction: b.instruction, phases: phases }, b);
           header(b);
@@ -196,29 +221,34 @@
         case 'holds': {
           var ht = holdTimes(S, week);
           var hold = b.hold === 'week' ? ht.hold : b.hold, relax = b.relax === 'week' ? ht.relax : b.relax;
-          var flick = b.anim === 'pulse', rel = b.anim === 'ripple', voiced = b.perRepVoice !== false;
-          for (s = 1; s <= b.sets; s++) {
+          var nSets = wv(b, 'sets', ht), nReps = wv(b, 'reps', ht);
+          var flick = b.anim === 'pulse', rel = b.anim === 'ripple' || b.anim === 'drop', voiced = b.perRepVoice !== false;
+          for (s = 1; s <= nSets; s++) {
             var intro = (s === 1 ? sectionIntro(b) + (b.introSay || b.name + '.') + ' ' : '') +
-              (b.sets > 1 ? 'Set ' + s + ' of ' + b.sets + '. ' : '') + 'Get ready.';
-            phases = [{ type: 'ready', dur: s === 1 && b.introSay ? 6 : 4, label: 'Get ready', say: intro }];
-            for (r = 1; r <= b.reps; r++) {
+              (nSets > 1 ? 'Set ' + s + ' of ' + nSets + '. ' : '') + 'Get ready.';
+            phases = [{ type: 'ready', dur: s === 1 && b.introSay ? 6 : 4, label: 'Get ready', say: intro, tip: (b.tips || {}).ready }];
+            for (r = 1; r <= nReps; r++) {
+              var tp = b.tips || {};
+              var main = {
+                type: flick ? 'flick' : rel ? 'release' : 'squeeze', dur: hold, label: b.squeezeLabel, rep: r, reps: nReps,
+                tone: flick ? 'flick' : 'start', interrupt: true, tip: tp.squeeze,
+                say: voiced ? (r === nReps && nReps > 1 ? 'Last one. ' : '') + b.squeezeSay : null
+              };
+              // optional second half of the main phase with its own label/colour/tip (e.g. 'Squeeze & lift' -> 'Hold')
+              if (b.thenLabel && hold > b.thenAt + 1) main.then = { at: b.thenAt, type: 'hold', label: b.thenLabel, tip: tp.then };
+              phases.push(main);
               phases.push({
-                type: flick ? 'flick' : rel ? 'release' : 'squeeze', dur: hold, label: b.squeezeLabel, rep: r, reps: b.reps,
-                tone: flick ? 'flick' : 'start', interrupt: true,
-                say: voiced ? (r === b.reps && b.reps > 1 ? 'Last one. ' : '') + b.squeezeSay : null
-              });
-              phases.push({
-                type: flick ? 'flickrel' : rel ? 'restRep' : 'relax', dur: relax, label: b.relaxLabel, rep: r, reps: b.reps,
-                tone: flick ? null : 'relax', interrupt: true, say: voiced ? b.relaxSay : null
+                type: flick ? 'flickrel' : rel ? 'restRep' : 'relax', dur: relax, label: b.relaxLabel, rep: r, reps: nReps,
+                tone: flick ? null : 'relax', interrupt: true, say: voiced ? b.relaxSay : null, tip: tp.relax
               });
             }
-            add({ kind: 'timed', name: b.name, set: s, sets: b.sets, anim: b.anim, instruction: b.instruction, phases: phases, endTone: 'set', spokenName: b.name, clockMode: hold <= 2 ? 'step' : null }, b);
-            if (s < b.sets && b.restBetweenSets) add(restStep(b.restBetweenSets, 'Set complete. Rest ' + b.restBetweenSets + ' seconds.'), b);
+            add({ kind: 'timed', name: b.name, set: s, sets: nSets, showSets: !!b.showSets, anim: b.anim, instruction: b.instruction, phases: phases, endTone: 'set', spokenName: b.name, clockMode: hold <= 2 ? 'step' : null }, b);
+            if (s < nSets && b.restBetweenSets) add(restStep(b.restBetweenSets, 'Set complete. Rest ' + b.restBetweenSets + ' seconds.'), b);
           }
           header(b);
           overview.push({
             title: b.name, from: first, optional: b.optional,
-            detail: (b.sets > 1 ? b.sets + ' sets × ' : '') + b.reps + ' reps · ' + hold + ' s ' + b.squeezeLabel.toLowerCase() + ' / ' + relax + ' s ' + b.relaxLabel.toLowerCase()
+            detail: (nSets > 1 ? nSets + ' sets × ' : '') + nReps + ' reps · ' + hold + ' s ' + b.squeezeLabel.toLowerCase() + ' / ' + relax + ' s ' + b.relaxLabel.toLowerCase()
           });
           break;
         }
@@ -332,7 +362,9 @@
       }
     });
     var total = steps.reduce(function (a, s) { return a + s.dur; }, 0);
-    return { steps: steps, overview: overview, total: total };
+    var cue = cueText(S, total);
+    if (cue && steps.length && steps[0].phases[0] && steps[0].phases[0].say) steps[0].phases[0].say = cue + '. ' + steps[0].phases[0].say;
+    return { steps: steps, overview: overview, total: total, cue: cue };
   }
   function spokenStep(s) {
     return s.name + (s.sets > 1 ? ', set ' + s.set + ' of ' + s.sets : '');
@@ -461,6 +493,7 @@
       var tip = SESSIONS[st.key].tip;
       $('pTip').hidden = !tip; if (tip) $('pTip').textContent = tip;
       $('player').classList.toggle('calm', !!SESSIONS[st.key].quiet);
+      $('player').classList.toggle('tips', !!SESSIONS[st.key].phaseTips);
       st.running = true; st.last = performance.now();
       goTo(0);
     }
@@ -477,6 +510,7 @@
       LS.set('recallLast', new Date().toISOString());     // next afternoon run asks "since your last break (hh:mm)"
       LS.set('recallRot', (LS.get('recallRot', 0) | 0) + 1); // rotate prompt variants
     }
+    st.streakRes = S.streak ? streakBump(new Date()) : null;
     renderDone();
     placeNotes('done');
     showScreen('done');
@@ -484,7 +518,7 @@
 
   /* ---------- player rendering ---------- */
   var COLORS = {
-    squeeze: '--warm', flick: '--warm', switch: '--warm', relax: '--cool', flickrel: '--cool', restRep: '--cool',
+    squeeze: '--warm', hold: '--hold', flick: '--warm', switch: '--warm', relax: '--cool', flickrel: '--cool', restRep: '--cool',
     rest: '--cool', exhale: '--cool', release: '--soft', settle: '--cool', reflect: '--soft', inhale: '--accent', work: '--accent', ready: '--text', reps: '--go'
   };
   var lastColor = null;
@@ -507,7 +541,7 @@
   function metaFor(step, ph) {
     var bits = [];
     if (step.round && !step.isRest) bits.push((step.roundWord || 'Round') + ' ' + step.round + ' of ' + step.rounds);
-    if (step.sets > 1) bits.push('Set ' + step.set + ' of ' + step.sets);
+    if (step.sets > 1 || step.showSets) bits.push('Set ' + step.set + ' of ' + step.sets);
     if (ph && ph.reps) bits.push((ph.repWord || 'Rep') + ' ' + ph.rep + ' of ' + ph.reps);
     else if (step.sets && ph && ph.type === 'ready') { var rr = step.phases[1] && step.phases[1].reps; if (rr) bits.push(rr + ' reps'); }
     if (ph && ph.side) bits.push(ph.side === 'left' ? 'Left side' : 'Right side');
@@ -518,10 +552,13 @@
     return bits.join(' · ');
   }
   var PLAY = 'M8 5v14l11-7z', PAUSE = 'M6 5h4v14H6zM14 5h4v14h-4z';
+  function effPhase(ph) { // a phase may switch label/colour/tip part-way (squeeze & lift -> hold)
+    return ph && ph.then && st.pt >= ph.then.at ? ph.then : ph;
+  }
   function render() {
     var step = cur();
     if (!step || $('player').hidden) return;
-    var ph = curPhase();
+    var ph = curPhase(), ep = effPhase(ph);
     setText($('pSection'), step.section || '');
     setText($('pName'), step.name);
     setText($('pMeta'), metaFor(step, ph));
@@ -538,10 +575,10 @@
         left = Math.ceil(step.dur - spent - 1e-6);
       }
       setText(clock, left >= 60 ? fmt(left) : String(Math.max(0, left)));
-      setText($('pPhase'), st.running ? ph.label : 'Paused');
-      setPhaseColor(ph.type);
+      setText($('pPhase'), st.running ? ep.label : 'Paused');
+      setPhaseColor(ep.type);
     }
-    setText($('pInstr'), step.instruction || '');
+    setText($('pInstr'), (!isReps && ep && ep.tip) || step.instruction || '');
     $('repsPanel').hidden = !isReps;
     var sk = $('btnSkipGroup');
     sk.hidden = !step.optional;
@@ -591,6 +628,21 @@
     cue.ripple = mk('g', {}, svg);
     cue.ripples = [0, 1, 2].map(function () { return mk('circle', { cx: 100, cy: 100, r: 30, class: 'ripple-ring' }, cue.ripple); });
     cue.rippleCore = mk('circle', { cx: 100, cy: 100, r: 28, class: 'ripple-core' }, cue.ripple);
+    // pelvic floor lift / drop: a circle that shrinks + rises on a squeeze, expands + sinks on a release, with a level bar
+    cue.floor = mk('g', {}, svg);
+    mk('circle', { cx: 100, cy: 100, r: 88, class: 'breath-guide' }, cue.floor);
+    mk('line', { x1: 8, y1: 100, x2: 172, y2: 100, class: 'floor-mid' }, cue.floor);
+    mk('rect', { x: 182, y: 22, width: 12, height: 156, rx: 6, class: 'cue-track', 'stroke-width': 0 }, cue.floor);
+    cue.floorFill = mk('rect', { x: 182, y: 100, width: 12, height: 0, rx: 6, class: 'floor-fill' }, cue.floor);
+    setText(mk('text', { x: 188, y: 14, class: 'cue-sub' }, cue.floor), 'UP');
+    setText(mk('text', { x: 188, y: 194, class: 'cue-sub' }, cue.floor), 'DOWN');
+    cue.floorCore = mk('circle', { cx: 100, cy: 100, r: 52, class: 'floor-core' }, cue.floor);
+    cue.floorIcon = mk('g', {}, cue.floor);
+    cue.fUp = mk('polygon', { points: '100,-20 122,6 108,6 108,22 92,22 92,6 78,6', class: 'floor-arrow' }, cue.floorIcon);
+    cue.fDown = mk('polygon', { points: '100,22 122,-4 108,-4 108,-20 92,-20 92,-4 78,-4', class: 'floor-arrow' }, cue.floorIcon);
+    cue.fHold = mk('g', {}, cue.floorIcon);
+    mk('rect', { x: 84, y: -16, width: 12, height: 32, rx: 3, class: 'floor-arrow' }, cue.fHold);
+    mk('rect', { x: 104, y: -16, width: 12, height: 32, rx: 3, class: 'floor-arrow' }, cue.fHold);
     // eyes far away
     cue.eyes = mk('g', {}, svg);
     mk('path', { d: 'M18 62 L52 34 L74 50 L108 20 L140 52 L160 40 L184 62', class: 'horizon' }, cue.eyes);
@@ -617,12 +669,12 @@
     $('stage').classList.toggle('fig', isFig);
     $('cueSvg').style.display = isFig ? 'none' : '';
     $('figSvg').style.display = isFig ? '' : 'none';
-    ['ring', 'breath', 'pulse', 'ripple', 'eyes', 'glow'].forEach(function (k) {
+    ['ring', 'breath', 'pulse', 'ripple', 'floor', 'eyes', 'glow'].forEach(function (k) {
       cue[k].style.display = (k === name || (k === 'ring' && name === 'rest')) ? '' : 'none';
     });
   }
   function drawCue(step, ph) {
-    var anim = step.anim === 'rest' ? 'rest' : step.anim === 'breathe' ? 'breath' : step.anim;
+    var anim = step.anim === 'rest' ? 'rest' : step.anim === 'breathe' ? 'breath' : (step.anim === 'lift' || step.anim === 'drop') ? 'floor' : step.anim;
     showCue(anim);
     var t = ph ? clamp01(st.pt / ph.dur) : 0, svg = $('cueSvg');
     svg.classList.toggle('glow', anim === 'ring' && ph && ph.type === 'squeeze');
@@ -635,6 +687,23 @@
       cue.arc.setAttribute('stroke-dashoffset', (C * (1 - fill)).toFixed(1));
       setText(cue.ringText, label);
       setText(cue.ringSub, ph.reps ? 'REP ' + ph.rep + ' / ' + ph.reps : '');
+    } else if (anim === 'floor') {
+      // L: -1 (fully dropped / reverse) ... 0 (normal) ... +1 (fully lifted)
+      var L = 0, icon = null, ty = ph.type;
+      if (ty === 'squeeze') { L = ease(clamp01(st.pt / (ph.then ? ph.then.at : ph.dur * 0.3))); icon = st.pt < (ph.then ? ph.then.at : 0) || !ph.then ? 'up' : 'hold'; }
+      else if (ty === 'relax') { L = 1 - ease(clamp01(st.pt / Math.min(ph.dur, 2))); icon = 'down'; }
+      else if (ty === 'release') { L = -ease(t); icon = 'down'; }
+      else if (ty === 'restRep') { L = -(1 - ease(clamp01(st.pt / Math.min(ph.dur, 2)))); icon = 'up'; }
+      if (reduceMotion) L = L > 0 ? 1 : L < 0 ? -1 : 0;
+      cue.floorCore.setAttribute('r', (52 - 20 * L).toFixed(1));
+      cue.floorCore.setAttribute('cy', (100 - 22 * L).toFixed(1));
+      var lvl = (L + 1) / 2, bh = 156 * lvl;
+      cue.floorFill.setAttribute('height', bh.toFixed(1)); cue.floorFill.setAttribute('y', (178 - bh).toFixed(1));
+      cue.floorIcon.setAttribute('transform', 'translate(0 ' + (100 - 22 * L).toFixed(1) + ')');
+      cue.fUp.style.display = icon === 'up' ? '' : 'none';
+      cue.fDown.style.display = icon === 'down' ? '' : 'none';
+      cue.fHold.style.display = icon === 'hold' ? '' : 'none';
+      cue.fUp.setAttribute('transform', 'translate(0 0)');
     } else if (anim === 'rest') {
       var prog = clamp01(st.pt / ph.dur);
       cue.arc.setAttribute('stroke-dashoffset', (C * prog).toFixed(1));
@@ -708,7 +777,8 @@
       picker.appendChild(b);
     });
     $('ovTitle').textContent = S.title;
-    $('ovSub').textContent = S.subtitle || '';
+    var sk = S.streak ? streakNow(new Date()) : 0;
+    $('ovSub').textContent = (plan.cue || S.subtitle || '') + (sk ? ' · 🔥 ' + sk + '-day streak' : '');
     $('ovTotal').textContent = fmtMin(plan.total);
     $('weekRow').hidden = !S.usesWeek;
     if (S.usesWeek) {
@@ -829,8 +899,9 @@
   }
   function renderDone() {
     var S = SESSIONS[st.key];
-    $('dTitle').textContent = S.doneTitle || 'Session complete';
-    $('dTime').textContent = S.title + ' · ' + fmt(st.realSec) + ' total';
+    var sr = S.streak ? st.streakRes : null;
+    $('dTitle').textContent = (S.doneTitle || 'Session complete') + (sr ? (sr.added ? ' Streak +1' : ' Streak ' + sr.count + ' (already counted today)') : '');
+    $('dTime').textContent = S.title + ' · ' + fmt(st.realSec) + ' total' + (sr ? ' · 🔥 ' + sr.count + '-day streak' : '');
     $('dLogBox').hidden = !S.logReps;
     $('copyMsg').textContent = '';
     if (!S.logReps) return;
@@ -896,12 +967,12 @@
     v.innerHTML = vo ? ICONS.voiceOn : ICONS.voiceOff;
     s.classList.toggle('off', !prefs.sound); v.classList.toggle('off', !vo);
     s.setAttribute('aria-pressed', String(prefs.sound)); v.setAttribute('aria-pressed', String(vo));
-    s.title = 'Sound ' + (prefs.sound ? 'on' : 'off'); v.title = 'Voice ' + (vo ? 'on' : 'off') + (isQuiet() ? ' (quiet session)' : '');
+    s.title = 'Sound ' + (prefs.sound ? 'on' : 'off'); v.title = 'Voice ' + (vo ? 'on' : 'off') + (isQuiet() ? ' (quiet session)' : voiceOptIn() ? ' (off by default for this session)' : '');
     $('optSound').checked = prefs.sound; $('optVoice').checked = vo;
-    $('optVoiceLabel').textContent = isQuiet() ? 'Voice (quiet)' : 'Voice cues';
+    $('optVoiceLabel').textContent = isQuiet() ? 'Voice (quiet)' : voiceOptIn() ? 'Voice cues (off by default here)' : 'Voice cues';
   }
   function setPref(k, val) {
-    if (k === 'voice' && isQuiet()) { // quiet session: its own switch; turning it on also enables voice globally
+    if (k === 'voice' && voiceOptIn()) { // quiet session: its own switch; turning it on also enables voice globally
       prefs.voiceQuiet = val; LS.set('voiceQuiet', val);
       if (val && !prefs.voice) { prefs.voice = true; LS.set('voice', true); }
     } else { prefs[k] = val; LS.set(k, val); }
@@ -978,5 +1049,5 @@
   showScreen('home');
 
   // debug/test hook
-  window.__coach = { st: st, build: build, speed: SPEED, summary: summaryText, recallContext: recallContext, notesText: notesText, voiceOn: voiceOn };
+  window.__coach = { st: st, build: build, speed: SPEED, summary: summaryText, recallContext: recallContext, streakBump: streakBump, streakNow: streakNow, notesText: notesText, voiceOn: voiceOn };
 })();

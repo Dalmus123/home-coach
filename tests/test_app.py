@@ -69,7 +69,7 @@ async def main():
         await fits(page, "pelvic-slow-holds")
         await page.screenshot(path=SHOTS + "pelvic-slow-holds.png")
         # quick flicks & reverse kegels screenshots
-        for target, fname in [("Quick flicks", "pelvic-quick-flicks.png"), ("Reverse kegels", "pelvic-reverse-kegels.png"), ("Lunge hip-flexor stretch", "pelvic-stretch.png")]:
+        for target, fname in [("Quick flicks", "pelvic-quick-flicks.png"), ("Reverse kegels", "pelvic-reverse-kegels.png")]:
             for _ in range(80):
                 s = await state(page)
                 if s["name"] == target: break
@@ -79,10 +79,6 @@ async def main():
                 if s["phase"] not in ("ready",) and s["pt"] > 0.3: break
                 await page.wait_for_timeout(20)
             await page.screenshot(path=SHOTS + fname)
-        results["pelvic:skip-visible-in-stretch"] = await page.is_visible("#btnSkipGroup")
-        await page.click("#btnSkipGroup")
-        await page.wait_for_timeout(300)
-        results["pelvic:after-skip-done-screen"] = await page.is_visible("#done")
         await ctx.close()
 
         # 3. pelvic full natural run at speed=60
