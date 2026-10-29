@@ -37,12 +37,13 @@
         <div class="ov-total" id="ovTotal"></div>
       </div>
       <div class="week" id="weekRow" hidden>
-        <span class="week-label">Week</span>
+        <span class="week-label" id="weekLabel">Week</span>
         <button class="icon-btn small" id="weekMinus" aria-label="Previous week">−</button>
         <span class="week-val" id="weekVal">1</span>
         <button class="icon-btn small" id="weekPlus" aria-label="Next week">+</button>
         <span class="muted week-hold" id="weekHold"></span>
       </div>
+      <p class="muted ov-level" id="ovLevel" hidden></p>
       <ol class="ov-list" id="ovList"></ol>
       <p class="tip" id="ovTip" hidden></p>
     </div>
@@ -119,6 +120,7 @@
       <div class="done-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
       <h1 id="dTitle">Session complete</h1>
       <p class="muted" id="dTime"></p>
+      <p class="muted" id="dExtra" hidden></p>
     </div>
     <div class="card" id="dLogBox" hidden>
       <h3>Your log</h3>

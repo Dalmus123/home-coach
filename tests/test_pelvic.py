@@ -30,7 +30,7 @@ async def main():
         check("weeks pair up", all(info[str(a)]["total"] == info[str(a + 1)]["total"] for a in (1, 3, 5, 7, 9, 11)))
         check("cue text", w4["cue"] == "Same time, same spot, 4 minutes", w4["cue"])
         check("cue on home", info["sub"].startswith("Same time, same spot, 4 minutes"), info["sub"])
-        check("other sessions unchanged", info["other"] == {"recall": 120, "workout": 1936, "breaks": 188}, info["other"])
+        check("other sessions unchanged", info["other"] == {"recall": 120, "workout": 593, "breaks": 188}, info["other"])
         v = await page.evaluate("() => { localStorage.clear(); return null; }")
         await page.goto(BASE + "?s=pelvic&w=4")
         vp = await page.evaluate("() => __coach.voiceOn()")

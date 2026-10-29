@@ -62,7 +62,7 @@ async def main():
         check("device clock: 10:30 -> morning, 15:00 -> afternoon/lunch",
               info["ctxAm"]["period"] == "morning" and info["ctxPm"]["period"] == "afternoon" and info["ctxPm"]["since"] == "lunch",
               [info["ctxAm"], info["ctxPm"]])
-        check("existing session totals unchanged", info["totals"] == {"pelvic": 202, "workout": 1936, "breaks": 188}, info["totals"])
+        check("existing session totals unchanged", info["totals"] == {"pelvic": 202, "workout": 593, "breaks": 188}, info["totals"])
         check("picker lists recall", any(t.startswith("Recall & consolidate") for t in info["picker"]), info["picker"])
         check("voice off by default for recall", info["voiceChecked"] is False and info["voiceLabel"] == "Voice (quiet)")
         await page.screenshot(path=SHOTS + "recall-home-phone.png", full_page=True)

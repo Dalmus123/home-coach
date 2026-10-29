@@ -94,53 +94,25 @@ async def main():
         results["pelvic:full-run"] = {"finished": s["finished"], "sequence": seen}
         await ctx.close()
 
-        # 4. workout: rep-entry screen, then full run with Done clicks
+        # 4. workout (level 1): full timed run, then the done screen
         ctx, page = await new_page(browser)
         await page.goto(BASE + "?s=workout&speed=60")
         await page.click("#btnStart")
-        for _ in range(400):
-            s = await state(page)
-            if s["kind"] == "reps": break
-            await page.wait_for_timeout(25)
-        results["workout:first-reps-step"] = s
-        await page.fill("#repsInput", "10")
-        await page.wait_for_timeout(300)
-        await fits(page, "workout-reps")
-        await page.screenshot(path=SHOTS + "workout-done-rep-entry.png")
-        import random
-        random.seed(1)
-        clicks = 0
         for _ in range(4000):
             s = await state(page)
             if s["finished"]: break
-            if s["kind"] == "reps":
-                if s["name"] != "Push-ups" or s["i"] != results["workout:first-reps-step"]["i"]:
-                    await page.fill("#repsInput", str(random.randint(8, 20)))
-                await page.click("#btnDone"); clicks += 1
-                await page.wait_for_timeout(60)
-            elif s["name"] == "Plank" and s["phase"] == "work" and s["pt"] > 5:
-                await page.wait_for_timeout(20)
-            else:
-                await page.wait_for_timeout(25)
-        results["workout:full-run"] = {"finished": s["finished"], "done_clicks": clicks}
+            await page.wait_for_timeout(25)
+        results["workout:full-run"] = {"finished": s["finished"]}
         await page.wait_for_timeout(300)
-        results["workout:summary"] = await page.inner_text("#dText")
-        await page.click("#btnCopy")
-        await page.wait_for_timeout(300)
-        results["workout:copy-msg"] = await page.inner_text("#copyMsg")
-        try:
-            results["workout:clipboard"] = (await page.evaluate("navigator.clipboard.readText()"))[:80]
-        except Exception as e:
-            results["workout:clipboard"] = f"read failed: {e}"
-        results["workout:localStorage"] = await page.evaluate("JSON.parse(localStorage.getItem('coach.lastSummary')).text.slice(0,60)")
+        results["workout:done"] = [await page.inner_text("#dTitle"), await page.inner_text("#dTime"), await page.inner_text("#dExtra")]
         await page.screenshot(path=SHOTS + "workout-summary.png", full_page=True)
         await ctx.close()
 
-        # 5. workout figure screenshot (pike) + breaks run
+        # 5. workout exercise screenshot
         ctx, page = await new_page(browser)
         await page.goto(BASE + "?s=workout")
         await page.click("#btnStart")
-        for _ in range(4): await page.click("#btnFwd"); await page.wait_for_timeout(50)
+        for _ in range(3): await page.click("#btnFwd"); await page.wait_for_timeout(50)
         await page.wait_for_timeout(700)
         await page.screenshot(path=SHOTS + "workout-squats-reps.png")
         await ctx.close()

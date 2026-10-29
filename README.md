@@ -5,12 +5,24 @@ Static, dependency-free guided workout player (HTML/CSS/JS, no build step, no CD
 - `index.html`, `style.css`, `figures.js`, `app.js`: the app
 - `sessions.js`: **all session definitions** (edit this to change routines; block types documented at the top)
 - `build.py`: inlines everything into one self-contained `dist/index.html`
-- `tests/`: headless-Chrome checks (Playwright): `test_app.py` (all sessions), `layout.py` (player fit), `test_recall.py` (recall, assertion-based)
+- `tests/`: headless-Chrome checks (Playwright): `test_app.py` (all sessions), `layout.py` (player fit), `test_recall.py` (recall), `test_pelvic.py`, `test_workout.py` (level table, level-up, streak; assertion-based)
 
 ## URLs
 - `?s=pelvic&w=1`: Core & pelvic floor (3-5 min habit loop: cue "Same time, same spot, N minutes" → session → "Done ✅ Streak +1"; week 1-2: 5 s hold, 3-4: 8 s, 5+: 10 s; grows ~30-60 s every 2 weeks, ~3:20 → ~7:20 by week 11-12; voice off by default)
-- `?s=workout`: Home full-body, week 1 (~32 min): warm-up, 3-round circuit (push-ups optionally on the ab wheel handles),
-  ab wheel rollouts 3 × 6-8 (kneeling, 50 s rest), chair core 2 rounds
+- `?s=workout`: Home full-body, 10 levels, no equipment (ab wheel from level 4). Level = 1 + completed workouts / 6 (kept in
+  localStorage `coach.done.workout`; roughly 2 weeks per level at 3 a week), so it grows with consistency, not the calendar.
+  `?level=N` (or `?w=N`, or the −/+ buttons) previews/overrides a level. Habit loop: cue "Same time, same spot, N minutes" → timed
+  warm-up, circuit (work / rest intervals, "Round X of Y · Exercise N of M", a one-line form tip per move), cool-down →
+  "Done ✅ Streak +1" with the workout streak (`coach.streakWorkout`) and session count. Home shows "Level N · X min" and the next level.
+  Level 1 (~10 min): 1 min warm-up (march, arm circles) → 2 rounds × 6 moves (incline push-ups, squats, table rows, glute bridges,
+  reverse lunges, plank), 30 s work / 10 s rest → 1 min cool-down.
+
+  | Level | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+  |---|---|---|---|---|---|---|---|---|---|---|
+  | Minutes | ~10 | ~12.5 | ~15 | ~17.5 | ~20 | ~23 | ~26 | ~29 | ~32 | ~35 |
+  | Sessions needed | 0 | 6 | 12 | 18 | 24 | 30 | 36 | 42 | 48 | 54 |
+
+  Edit the `holdByWeek` table and the exercise variants in `sessions.js` to change it.
 - `?s=breaks`: 3-minute desk reset
 - `?s=recall`: Recall & consolidate, a 2-minute quiet 'zone out and recall' break (see below)
 - Debug: add `&speed=10` to run timers 10x faster.

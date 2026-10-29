@@ -168,18 +168,28 @@
   }
 
   /* streak (localStorage 'coach.streak' = { count, last: local day key, best }); counts one per day, consecutive days */
-  function streakNow(now) { // the streak still alive today (0 if the last day done was before yesterday)
-    var d = LS.get('streak', null), y = new Date(now); y.setDate(y.getDate() - 1);
+  function streakNow(now, key) { // the streak still alive today (0 if the last day done was before yesterday)
+    var d = LS.get(key || 'streak', null), y = new Date(now); y.setDate(y.getDate() - 1);
     return d && (d.last === dayKey(now) || d.last === dayKey(y)) ? (d.count | 0) : 0;
   }
-  function streakBump(now) { // -> { count, added }
+  function streakBump(now, key) { // -> { count, added }
     now = now || new Date();
-    var d = LS.get('streak', null) || { count: 0, last: null, best: 0 };
+    var d = LS.get(key || 'streak', null) || { count: 0, last: null, best: 0 };
     if (d.last === dayKey(now)) return { count: d.count | 0, added: false };
-    d.count = streakNow(now) + 1; d.last = dayKey(now); d.best = Math.max(d.best | 0, d.count);
-    LS.set('streak', d);
+    d.count = streakNow(now, key) + 1; d.last = dayKey(now); d.best = Math.max(d.best | 0, d.count);
+    LS.set(key || 'streak', d);
     return { count: d.count, added: true };
   }
+
+  /* levels (sessions with levelByDone): level = 1 + floor(completed workouts / levelEvery), capped at maxLevel.
+     The completed count lives in localStorage 'coach.done.<session>'. ?level=N / ?w=N or the +/- buttons override it. */
+  function doneCount(key) { return Math.max(0, LS.get('done.' + key, 0) | 0); }
+  function autoLevel(key) {
+    var S = SESSIONS[key];
+    return S.levelByDone ? Math.min(S.maxLevel || 10, 1 + Math.floor(doneCount(key) / (S.levelEvery || 6))) : 1;
+  }
+  function maxWeek(key) { return SESSIONS[key].levelByDone ? (SESSIONS[key].maxLevel || 10) : 12; }
+  function weekWord(key) { return SESSIONS[key].levelByDone ? 'Level' : 'Week'; }
 
   function build(key, week, rctx) {
     var S = SESSIONS[key], steps = [], overview = [];
@@ -205,6 +215,7 @@
 
     S.blocks.forEach(function (b) {
       var first = steps.length, r, s, i, phases;
+      if (b.minLevel && week < b.minLevel) return; // exercise/move that unlocks at a higher level
       switch (b.type) {
         case 'breathing': {
           var n = Math.max(1, Math.round(wv(b, 'seconds', holdTimes(S, week)) / (b.inhale + b.exhale)));
@@ -269,11 +280,12 @@
         case 'timed': {
           phases = [];
           var introT = sectionIntro(b) + b.name;
+          var tSec = wv(b, 'seconds', holdTimes(S, week));
           if (ready) phases.push({ type: 'ready', dur: ready, label: 'Get ready', say: introT });
-          phases.push({ type: 'work', dur: b.seconds, label: 'Keep going', say: ready ? null : introT, tone: 'start', ticks: true, cues: b.cues });
+          phases.push({ type: 'work', dur: tSec, label: b.label || 'Keep going', say: ready ? null : introT, tone: 'start', ticks: true, cues: b.cues });
           add({ kind: 'timed', name: b.name, anim: b.anim || 'figure', figure: b.figure, instruction: b.instruction, phases: phases }, b);
           header(b);
-          overview.push({ title: b.name, detail: b.seconds + ' s', from: first, optional: b.optional });
+          overview.push({ title: b.name, detail: tSec + ' s', from: first, optional: b.optional });
           break;
         }
         case 'reflect': {
@@ -318,6 +330,40 @@
           overview.push({ title: 'Rests', detail: (b.exercises.length > 1 ? b.restBetweenExercises + ' s between moves · ' : '') + b.restBetweenRounds + ' s between ' + RW.toLowerCase() + 's', muted: true });
           break;
         }
+        case 'tcircuit': { // timed circuit: every exercise is work seconds then rest seconds; level-driven (see workout)
+          var row = holdTimes(S, week), exs = [];
+          b.exercises.forEach(function (ex) {
+            if (ex.minLevel && week < ex.minLevel) return;
+            var v = ex.variants[ex.variants.length - 1];
+            for (var vi = 0; vi < ex.variants.length; vi++) if (week <= ex.variants[vi].upTo) { v = ex.variants[vi]; break; }
+            exs.push({ name: v.name, tip: v.tip, figure: ex.figure, work: v.cap ? Math.min(row.work, v.cap) : row.work });
+          });
+          var nEx = exs.length;
+          header(b, b.section + ' · ' + row.rounds + ' rounds × ' + nEx + ' moves');
+          for (r = 1; r <= row.rounds; r++) {
+            exs.forEach(function (ex, xi) {
+              var pre = (xi === 0 ? sectionIntro(b) + 'Round ' + r + ' of ' + row.rounds + '. ' : '');
+              phases = [];
+              if (r === 1 && xi === 0) phases.push({ type: 'ready', dur: 3, label: 'Get ready', say: pre + ex.name + '.' });
+              phases.push({ type: 'work', dur: ex.work, label: 'Work', say: (r === 1 && xi === 0) ? 'Go' : pre + ex.name + '. Go', tone: 'start', ticks: true, tip: ex.tip });
+              add({ kind: 'timed', name: ex.name, anim: 'figure', figure: ex.figure, instruction: ex.tip, round: r, rounds: row.rounds,
+                meta: 'Round ' + r + ' of ' + row.rounds + ' · Exercise ' + (xi + 1) + ' of ' + nEx, phases: phases }, b);
+              var nxt = xi < nEx - 1 ? exs[xi + 1] : (r < row.rounds ? exs[0] : null);
+              if (nxt) {
+                var secs = xi < nEx - 1 ? row.rest : row.roundRest;
+                add(restStep(secs, (xi < nEx - 1 ? 'Rest. ' : 'Round ' + r + ' done. Rest. '), {
+                  round: r, rounds: row.rounds, name: xi < nEx - 1 ? 'Rest' : 'Round ' + r + ' done · rest',
+                  instruction: 'Next: ' + nxt.name + '. ' + nxt.tip,
+                  meta: xi < nEx - 1 ? 'Round ' + r + ' of ' + row.rounds + ' · Next: exercise ' + (xi + 2) + ' of ' + nEx
+                    : 'Round ' + r + ' of ' + row.rounds + ' done · Next: round ' + (r + 1) + ' of ' + row.rounds
+                }), b);
+              }
+            });
+          }
+          exs.forEach(function (ex) { overview.push({ title: ex.name, detail: ex.work + ' s × ' + row.rounds + ' rounds' }); });
+          overview.push({ title: 'Rests', detail: row.rest + ' s between moves · ' + row.roundRest + ' s between rounds', muted: true });
+          break;
+        }
         case 'interval': {
           header(b, b.section + ' · ' + b.rounds + ' rounds');
           for (r = 1; r <= b.rounds; r++) {
@@ -357,7 +403,14 @@
       if (o.header) o.seconds = steps.filter(function (s) { return s.sectionKey === o.key; }).reduce(function (a, s) { return a + s.dur; }, 0);
       else if (o.from !== undefined) {
         var nextFrom = steps.length;
-        for (var j = idx + 1; j < overview.length; j++) if (overview[j].from !== undefined) { nextFrom = overview[j].from; break; }
+        for (var j = idx + 1; j < overview.length; j++) {
+          if (overview[j].from !== undefined) { nextFrom = overview[j].from; break; }
+          if (overview[j].header) { // a new section starts: this row ends where that section's first step is
+            var hk = overview[j].key, fs = -1;
+            for (var q = 0; q < steps.length; q++) if (steps[q].sectionKey === hk) { fs = q; break; }
+            if (fs >= 0) { nextFrom = fs; break; }
+          }
+        }
         o.seconds = steps.slice(o.from, nextFrom).reduce(function (a, s) { return a + s.dur; }, 0);
       }
     });
@@ -510,7 +563,13 @@
       LS.set('recallLast', new Date().toISOString());     // next afternoon run asks "since your last break (hh:mm)"
       LS.set('recallRot', (LS.get('recallRot', 0) | 0) + 1); // rotate prompt variants
     }
-    st.streakRes = S.streak ? streakBump(new Date()) : null;
+    st.streakRes = S.streak ? streakBump(new Date(), S.streakKey) : null;
+    st.levelRes = null;
+    if (S.levelByDone) { // one more completed workout; every levelEvery of them unlock the next level
+      var before = autoLevel(st.key);
+      LS.set('done.' + st.key, doneCount(st.key) + 1);
+      st.levelRes = { count: doneCount(st.key), before: before, after: autoLevel(st.key), played: st.week };
+    }
     renderDone();
     placeNotes('done');
     showScreen('done');
@@ -539,6 +598,7 @@
     return Math.max(0, r);
   }
   function metaFor(step, ph) {
+    if (step.meta) return step.meta;
     var bits = [];
     if (step.round && !step.isRest) bits.push((step.roundWord || 'Round') + ' ' + step.round + ' of ' + step.rounds);
     if (step.sets > 1 || step.showSets) bits.push('Set ' + step.set + ' of ' + step.sets);
@@ -586,7 +646,7 @@
     setText($('pNext'), stepLabel(st.steps[st.i + 1]));
     var total = st.plan.total, rem = remainingSec();
     $('pBar').style.width = (100 * (1 - rem / total)).toFixed(1) + '%';
-    setText($('pCount'), 'Step ' + (st.i + 1) + ' of ' + st.steps.length + (SESSIONS[st.key].usesWeek ? ' · Week ' + st.week : ''));
+    setText($('pCount'), 'Step ' + (st.i + 1) + ' of ' + st.steps.length + (SESSIONS[st.key].usesWeek ? ' · ' + weekWord(st.key) + ' ' + st.week : ''));
     setText($('pEta'), fmt(rem) + ' left');
     var icon = st.running ? PAUSE : PLAY;
     var path = $('playIcon').firstChild;
@@ -757,7 +817,10 @@
   function setUrl() {
     var p = new URLSearchParams(location.search);
     p.set('s', st.key);
-    if (SESSIONS[st.key].usesWeek) p.set('w', st.week); else p.delete('w');
+    var US = SESSIONS[st.key];
+    p.delete('w'); p.delete('level');
+    if (US.levelByDone) { if (st.manual) p.set('level', st.week); }
+    else if (US.usesWeek) p.set('w', st.week);
     try { history.replaceState(null, '', location.pathname + '?' + p.toString()); } catch (e) {}
   }
   function renderHome() {
@@ -769,22 +832,43 @@
       var b = document.createElement('button');
       b.className = 'pick'; b.type = 'button';
       b.setAttribute('aria-pressed', String(k === st.key));
-      var tot = build(k, k === st.key ? st.week : 1).total;
+      var tot = build(k, k === st.key ? st.week : SESSIONS[k].levelByDone ? autoLevel(k) : 1).total;
       b.innerHTML = '<span></span><small></small>';
       b.firstChild.textContent = SESSIONS[k].title;
       b.lastChild.textContent = fmtMin(tot);
-      b.addEventListener('click', function () { st.key = k; setUrl(); renderHome(); });
+      b.addEventListener('click', function () {
+        if (k === st.key) return;
+        st.weekBy[st.key] = st.week; st.manualBy[st.key] = st.manual;
+        st.key = k;
+        var Sk = SESSIONS[k];
+        st.manual = !!st.manualBy[k];
+        st.week = st.weekBy[k] != null && (!Sk.levelByDone || st.manual) ? st.weekBy[k] : Sk.levelByDone ? autoLevel(k) : (st.week || 1);
+        if (st.week > maxWeek(k)) st.week = maxWeek(k);
+        setUrl(); renderHome();
+      });
       picker.appendChild(b);
     });
     $('ovTitle').textContent = S.title;
-    var sk = S.streak ? streakNow(new Date()) : 0;
+    var sk = S.streak ? streakNow(new Date(), S.streakKey) : 0;
     $('ovSub').textContent = (plan.cue || S.subtitle || '') + (sk ? ' · 🔥 ' + sk + '-day streak' : '');
     $('ovTotal').textContent = fmtMin(plan.total);
     $('weekRow').hidden = !S.usesWeek;
+    $('ovLevel').hidden = !S.levelByDone;
     if (S.usesWeek) {
       var ht = holdTimes(S, st.week);
+      $('weekLabel').textContent = weekWord(st.key);
+      $('weekMinus').setAttribute('aria-label', 'Previous ' + weekWord(st.key).toLowerCase());
+      $('weekPlus').setAttribute('aria-label', 'Next ' + weekWord(st.key).toLowerCase());
       $('weekVal').textContent = st.week;
-      $('weekHold').textContent = ht.hold + ' s hold / ' + ht.relax + ' s relax';
+      if (S.levelByDone) {
+        var mx = S.maxLevel || 10, au = autoLevel(st.key), dn = doneCount(st.key);
+        $('weekHold').textContent = 'Level ' + st.week + ' · ' + fmtMin(plan.total);
+        var nl = '', pre = st.week !== au ? 'Your level: ' + au + ' (' + dn + ' done). ' : '';
+        if (au < mx) {
+          nl = 'Next: Level ' + (au + 1) + ' · ' + fmtMin(build(st.key, au + 1).total) + ' after ' + (S.levelEvery - dn % S.levelEvery) + ' more session' + (S.levelEvery - dn % S.levelEvery === 1 ? '' : 's') + ' (' + dn + ' done)';
+        } else nl = 'Peak level (Level ' + mx + ') · ' + dn + ' sessions done';
+        $('ovLevel').textContent = pre + nl;
+      } else $('weekHold').textContent = ht.hold + ' s hold / ' + ht.relax + ' s relax';
     }
     var list = $('ovList');
     list.innerHTML = '';
@@ -902,6 +986,15 @@
     var sr = S.streak ? st.streakRes : null;
     $('dTitle').textContent = (S.doneTitle || 'Session complete') + (sr ? (sr.added ? ' Streak +1' : ' Streak ' + sr.count + ' (already counted today)') : '');
     $('dTime').textContent = S.title + ' · ' + fmt(st.realSec) + ' total' + (sr ? ' · 🔥 ' + sr.count + '-day streak' : '');
+    var lr = S.levelByDone ? st.levelRes : null, ex = $('dExtra');
+    ex.hidden = !lr;
+    if (lr) {
+      var line = 'Workout #' + lr.count + ' · Level ' + lr.played;
+      if (lr.after > lr.before) line += ' · 🎉 Level up! Next time: Level ' + lr.after + ' (~' + Math.round(build(st.key, lr.after).total / 60) + ' min)';
+      else if (lr.after < (S.maxLevel || 10)) line += ' · ' + (S.levelEvery - lr.count % S.levelEvery) + ' more to Level ' + (lr.after + 1);
+      else line += ' · peak level';
+      ex.textContent = line;
+    }
     $('dLogBox').hidden = !S.logReps;
     $('copyMsg').textContent = '';
     if (!S.logReps) return;
@@ -1031,8 +1124,8 @@
   on('pVoice', 'click', function () { setPref('voice', !prefs.voice); });
   on('optSound', 'change', function (e) { setPref('sound', e.target.checked); });
   on('optVoice', 'change', function (e) { setPref('voice', e.target.checked); });
-  on('weekMinus', 'click', function () { st.week = Math.max(1, st.week - 1); setUrl(); renderHome(); });
-  on('weekPlus', 'click', function () { st.week = Math.min(12, st.week + 1); setUrl(); renderHome(); });
+  on('weekMinus', 'click', function () { st.week = Math.max(1, st.week - 1); st.manual = true; setUrl(); renderHome(); });
+  on('weekPlus', 'click', function () { st.week = Math.min(maxWeek(st.key), st.week + 1); st.manual = true; setUrl(); renderHome(); });
   document.addEventListener('keydown', function (e) {
     if ($('player').hidden || /INPUT|TEXTAREA/.test(document.activeElement && document.activeElement.tagName)) return;
     if (e.key === ' ') { e.preventDefault(); $('btnPlay').click(); }
@@ -1043,11 +1136,14 @@
   /* ---------- init ---------- */
   var sParam = qs.get('s');
   st.key = SESSIONS[sParam] ? sParam : Object.keys(SESSIONS)[0];
-  st.week = Math.min(12, Math.max(1, parseInt(qs.get('w'), 10) || 1));
+  st.weekBy = {}; st.manualBy = {};
+  var wParam = parseInt(qs.get('level'), 10) || parseInt(qs.get('w'), 10) || 0; // ?level= or ?w= overrides the automatic level
+  st.manual = !!wParam && !!SESSIONS[st.key].levelByDone;
+  st.week = Math.min(maxWeek(st.key), Math.max(1, wParam || (SESSIONS[st.key].levelByDone ? autoLevel(st.key) : 1)));
   mountCues();
   syncToggles();
   showScreen('home');
 
   // debug/test hook
-  window.__coach = { st: st, build: build, speed: SPEED, summary: summaryText, recallContext: recallContext, streakBump: streakBump, streakNow: streakNow, notesText: notesText, voiceOn: voiceOn };
+  window.__coach = { st: st, build: build, speed: SPEED, summary: summaryText, recallContext: recallContext, streakBump: streakBump, streakNow: streakNow, autoLevel: autoLevel, doneCount: doneCount, notesText: notesText, voiceOn: voiceOn };
 })();

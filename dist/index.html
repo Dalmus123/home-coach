@@ -221,6 +221,8 @@ pre { white-space: pre-wrap; word-break: break-word; font: 13px/1.45 ui-monospac
   #player.calm .instr { display: flex; -webkit-line-clamp: unset; overflow: visible; }
   #player.calm .notes-head { display: none; }
 }
+.ov-level { font-size: 14px; margin: 8px 0 0; }
+#dExtra { margin-top: -6px; }
 </style>
 </head>
 <body>
@@ -247,12 +249,13 @@ pre { white-space: pre-wrap; word-break: break-word; font: 13px/1.45 ui-monospac
         <div class="ov-total" id="ovTotal"></div>
       </div>
       <div class="week" id="weekRow" hidden>
-        <span class="week-label">Week</span>
+        <span class="week-label" id="weekLabel">Week</span>
         <button class="icon-btn small" id="weekMinus" aria-label="Previous week">−</button>
         <span class="week-val" id="weekVal">1</span>
         <button class="icon-btn small" id="weekPlus" aria-label="Next week">+</button>
         <span class="muted week-hold" id="weekHold"></span>
       </div>
+      <p class="muted ov-level" id="ovLevel" hidden></p>
       <ol class="ov-list" id="ovList"></ol>
       <p class="tip" id="ovTip" hidden></p>
     </div>
@@ -329,6 +332,7 @@ pre { white-space: pre-wrap; word-break: break-word; font: 13px/1.45 ui-monospac
       <div class="done-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
       <h1 id="dTitle">Session complete</h1>
       <p class="muted" id="dTime"></p>
+      <p class="muted" id="dExtra" hidden></p>
     </div>
     <div class="card" id="dLogBox" hidden>
       <h3>Your log</h3>
@@ -376,13 +380,16 @@ pre { white-space: pre-wrap; word-break: break-word; font: 13px/1.45 ui-monospac
  *                 roundWord: 'Set' (optional; says 'Set 1 of 3' instead of 'Round 1 of 3', e.g. single-exercise straight sets)
  *                 { name, reps: '15–20', est, figure, instruction, say }  -> rep-based, tap Done (say: extra spoken cue, round 1 only)
  *                 { name, seconds, figure, log: 'time', instruction } ] } -> timed
+ *   tcircuit  : { exercises: [{ name, figure, minLevel, variants: [{ upTo, name, tip, cap }] }] }  timed circuit driven by the session's
+ *               level row (rounds, work, rest, roundRest): 'Round X of Y · Exercise N of M', one tip per move (workout)
  *   interval  : { rounds, work, transition, setup: { seconds, label }, exercises: [{ name, figure, side, instruction }] }
  *   reflect   : { name, seconds, label, settle, instruction, prompts }   (calm 'glow' ring, soft chime, no ticks)
  *               prompts: [variants...] or { morning: [...], afternoon: [...] } (device clock: before 12:00 = morning).
  *               One variant is used per run and rotates each time the session is finished.
  *               '{since}' becomes 'lunch' or 'your last break (14:05)' (time of the last recall finished today).
  *
- * Session flags: voiceDefaultOff (voice silent until switched on), phaseTips (roomier tip line under the timer), cue ('{min}' = rounded minutes; shown on home, spoken first), streak (finish screen + localStorage
+ * Session flags: levelByDone + levelEvery + maxLevel (level from completed sessions in localStorage; ?level= overrides), streakKey, minLevel on any block,
+ *   voiceDefaultOff (voice silent until switched on), phaseTips (roomier tip line under the timer), cue ('{min}' = rounded minutes; shown on home, spoken first), streak (finish screen + localStorage
  *   streak counter), quiet (soft chime instead of beeps, voice off unless turned on for quiet sessions, quiet speech),
  *   notes (shows the on-device notes box), doneTitle, doneSay, foot.
  *
@@ -487,58 +494,91 @@ window.COACH_SESSIONS = {
   workout: {
     title: 'Home full-body',
     short: 'Full-body',
-    subtitle: 'Week 1 · bodyweight + a backpack',
-    logReps: true,
-    readySeconds: 3,
+    subtitle: 'Beginner full-body · no equipment',
+    // Habit loop: CUE (same time, same spot, N minutes) -> CRAVING (that strong, energised feeling) ->
+    // REWARD ("Done ✅ Streak +1", a workout streak and a session count, kept in localStorage).
+    cue: 'Same time, same spot, {min} minutes',
+    streak: true,
+    streakKey: 'streakWorkout',
+    phaseTips: true,
+    tip: 'Craving: feeling strong and energised afterwards. Reward: Done ✅ Streak +1.',
+    doneTitle: 'Done ✅',
+    doneSay: 'Done. Streak plus one. Nice work.',
+    readySeconds: 0,
+    usesWeek: true,
+    // Progression is by COMPLETED workouts (localStorage 'coach.done.workout'), not by calendar week:
+    // level = 1 + floor(completed / levelEvery), capped at maxLevel. ?level=N (or ?w=N) overrides it.
+    levelByDone: true,
+    levelEvery: 6,   // 6 sessions per level (about 2 weeks at 3 a week)
+    maxLevel: 10,
+    /*
+     * Level table (each row: maxWeek = the level). Keys: warm / cool = seconds per warm-up / cool-down move,
+     * rounds, work = seconds of work per exercise, rest = rest between exercises, roundRest = rest between rounds.
+     * Exercises have minLevel (added at that level) and variants (harder versions: name/tip/cap change at `upTo`).
+     * Approx. total time (warm-up + circuit + cool-down), the level table in README:
+     *   L1 10 · L2 12.5 · L3 15 · L4 17.5 · L5 20 · L6 23 · L7 26 · L8 29 · L9 32 · L10 35 min
+     * Each level adds a round, longer work, an extra exercise or a harder variation (about 2-3 minutes more).
+     */
+    holdByWeek: [
+      { maxWeek: 1,  warm: 30, cool: 30, rounds: 2, work: 30, rest: 10, roundRest: 20 },
+      { maxWeek: 2,  warm: 30, cool: 30, rounds: 2, work: 45, rest: 10, roundRest: 30 },
+      { maxWeek: 3,  warm: 30, cool: 40, rounds: 3, work: 30, rest: 10, roundRest: 25 },
+      { maxWeek: 4,  warm: 30, cool: 40, rounds: 3, work: 30, rest: 10, roundRest: 25 },
+      { maxWeek: 5,  warm: 40, cool: 40, rounds: 3, work: 35, rest: 10, roundRest: 30 },
+      { maxWeek: 6,  warm: 45, cool: 45, rounds: 3, work: 40, rest: 10, roundRest: 40 },
+      { maxWeek: 7,  warm: 45, cool: 40, rounds: 3, work: 35, rest: 15, roundRest: 40 },
+      { maxWeek: 8,  warm: 50, cool: 40, rounds: 3, work: 40, rest: 15, roundRest: 45 },
+      { maxWeek: 9,  warm: 50, cool: 45, rounds: 4, work: 30, rest: 15, roundRest: 45 },
+      { maxWeek: 99, warm: 50, cool: 45, rounds: 4, work: 35, rest: 15, roundRest: 60 },
+    ],
     blocks: [
-      { type: 'timed', section: 'Warm-up', name: 'March in place', seconds: 60, figure: 'march',
+      { type: 'timed', section: 'Warm-up', name: 'March in place', seconds: 30, weekKeys: { seconds: 'warm' }, label: 'Warm up', figure: 'march',
         instruction: 'Lift the knees, swing the arms, breathe easy.' },
-      { type: 'timed', section: 'Warm-up', name: 'Arm circles', seconds: 60, figure: 'armcircles',
-        instruction: 'Small circles growing bigger. Switch direction halfway.',
-        cues: [{ at: 30, say: 'Switch direction' }] },
-      { type: 'timed', section: 'Warm-up', name: 'Slow bodyweight squats', seconds: 60, figure: 'squat',
-        instruction: 'Slow and controlled. Chest up, knees over toes.' },
+      { type: 'timed', section: 'Warm-up', name: 'Arm circles', seconds: 30, weekKeys: { seconds: 'warm' }, label: 'Warm up', figure: 'armcircles',
+        instruction: 'Small circles growing bigger. Switch direction halfway.' },
+      { type: 'timed', section: 'Warm-up', name: 'Easy squats', seconds: 30, weekKeys: { seconds: 'warm' }, label: 'Warm up', figure: 'squat', minLevel: 3,
+        instruction: 'Slow and shallow: just wake the legs up.' },
+      { type: 'timed', section: 'Warm-up', name: 'Calf raises', seconds: 30, weekKeys: { seconds: 'warm' }, label: 'Warm up', figure: 'calfraise', minLevel: 6,
+        instruction: 'Up on your toes, down slowly. Hold a wall for balance.' },
       {
-        type: 'circuit', section: 'Circuit', rounds: 3, restBetweenExercises: 20, restBetweenRounds: 90,
+        type: 'tcircuit', section: 'Circuit',
         exercises: [
-          { name: 'Push-ups', reps: '8–12', est: 40, figure: 'pushup',
-            say: 'Option: hands on the wheel handles. Keep the wheels still.',
-            instruction: 'Option: hands on wheel handles; keep wheels still (against a wall, press straight down). Straight line head to heels; knees down if needed.' },
-          { name: 'Squats', reps: '15–20', est: 50, figure: 'squat',
-            instruction: 'Sit back and down, chest up, drive up through the heels.' },
-          { name: 'Backpack rows', reps: '10–12', est: 40, figure: 'row',
-            instruction: 'Hinge forward with a flat back and pull the bag to your ribs.' },
-          { name: 'Pike push-ups', reps: '6–10', est: 35, figure: 'pike',
-            instruction: 'Hips high, bend the elbows and lower your head toward the floor.' },
-          { name: 'Glute bridges', reps: '15', est: 40, figure: 'bridge',
-            instruction: 'Drive through the heels, squeeze the glutes at the top.' },
-          { name: 'Plank', seconds: 30, figure: 'plank', log: 'time',
-            instruction: 'Forearms down, body in one straight line, brace the core.' },
+          { name: 'Push-ups', figure: 'pushup', variants: [
+            { upTo: 2, name: 'Incline push-ups', tip: 'Hands on a sturdy chair or sofa edge, body straight, lower your chest slowly.' },
+            { upTo: 5, name: 'Knee push-ups', tip: 'Knees down, a straight line from knees to head, elbows about 45° from your body.' },
+            { upTo: 8, name: 'Push-ups', tip: 'One straight line from head to heels; drop to your knees if your form slips.' },
+            { upTo: 99, name: 'Slow push-ups', tip: '3 seconds down, 1 second up. Keep your belly tight.' } ] },
+          { name: 'Squats', figure: 'squat', variants: [
+            { upTo: 3, name: 'Squats', tip: 'Feet shoulder-width, sit back and down, chest up, knees over your toes.' },
+            { upTo: 6, name: 'Slow squats', tip: '3 seconds down, 1 second up. Heels stay flat.' },
+            { upTo: 99, name: 'Squats with a pause', tip: 'Pause 2 seconds at the bottom, then stand up tall.' } ] },
+          { name: 'Table rows', figure: 'row', variants: [
+            { upTo: 4, name: 'Table rows (knees bent)', tip: 'Lie under a sturdy table, grip the edge, pull your chest up to it. Check it is stable first.' },
+            { upTo: 99, name: 'Table rows', tip: 'Legs straight, body in a line: pull your chest to the edge, squeeze your shoulder blades.' } ] },
+          { name: 'Glute bridges', figure: 'bridge', variants: [
+            { upTo: 4, name: 'Glute bridges', tip: 'Heels down, lift your hips. Squeeze the pelvic floor gently at the top, as in a kegel, while keeping your breath flowing.' },
+            { upTo: 7, name: 'Glute bridges (2 s squeeze)', tip: 'Lift and squeeze 2 seconds. Squeeze the pelvic floor gently at the top, as in a kegel, while keeping your breath flowing.' },
+            { upTo: 99, name: 'Hip thrusts (shoulders on the sofa)', tip: 'Drive your hips up. Squeeze the pelvic floor gently at the top, as in a kegel, while keeping your breath flowing.' } ] },
+          { name: 'Reverse lunges', figure: 'lunge', variants: [
+            { upTo: 99, name: 'Reverse lunges', tip: 'Step back, lower the back knee toward the floor, front knee over the ankle. Alternate legs.' } ] },
+          { name: 'Plank', figure: 'plank', variants: [
+            { upTo: 4, name: 'Plank', cap: 25, tip: 'Forearms down, a straight line from head to heels. Drop to your knees if needed.' },
+            { upTo: 7, name: 'Plank', cap: 30, tip: 'Forearms down, squeeze your glutes and belly, breathe steadily.' },
+            { upTo: 99, name: 'Plank', tip: 'Forearms down, squeeze your glutes and belly, breathe steadily.' } ] },
+          { name: 'Ab wheel rollouts', figure: 'rollout', minLevel: 4, variants: [
+            { upTo: 99, name: 'Ab wheel rollouts (kneeling)', tip: 'Roll out only as far as your lower back stays flat, then pull back. Stop if it hurts.' } ] },
+          { name: 'Dead bugs', figure: 'legraise', minLevel: 7, variants: [
+            { upTo: 99, name: 'Dead bugs', tip: 'Back flat on the floor: lower the opposite arm and leg slowly, keep your lower back pressed down.' } ] },
         ],
       },
-      {
-        type: 'circuit', section: 'Core finisher: ab wheel', roundWord: 'Set', rounds: 3,
-        restBetweenExercises: 0, restBetweenRounds: 50,
-        exercises: [
-          { name: 'Ab wheel rollouts', reps: '6–8', est: 40, figure: 'rollout',
-            say: 'Roll out only as far as your lower back stays flat. Stop if your lower back hurts.',
-            instruction: 'Start on your knees (towel under them), brace. Roll out only as far as your lower back stays flat, then pull back with your abs. Stop if any lower-back pain.' },
-        ],
-      },
-      {
-        type: 'interval', section: 'Core finisher: chair', rounds: 2, work: 30, transition: 10,
-        setup: { seconds: 20, label: 'Grab a sturdy chair' },
-        exercises: [
-          { name: 'Seated knee tucks', figure: 'kneetuck',
-            instruction: 'Sit on the front edge, hold the seat, draw the knees in and extend.' },
-          { name: 'Seated leg raises', figure: 'legraise',
-            instruction: 'Lean back slightly, legs straight, lift and lower with control.' },
-          { name: 'Side crunch (left)', figure: 'sidecrunch', side: 'left',
-            instruction: 'Hands by your head, crunch down to the left side.' },
-          { name: 'Side crunch (right)', figure: 'sidecrunch', side: 'right',
-            instruction: 'Hands by your head, crunch down to the right side.' },
-        ],
-      },
+      { type: 'timed', section: 'Cool-down', name: 'Hamstring stretch', seconds: 30, weekKeys: { seconds: 'cool' }, label: 'Stretch', figure: 'hamstring',
+        instruction: 'Easy and long: no bouncing. Switch legs halfway.' },
+      { type: 'timed', section: 'Cool-down', name: 'Chest opener', seconds: 30, weekKeys: { seconds: 'cool' }, label: 'Stretch', figure: 'chestopener',
+        instruction: 'Hands behind you, open the chest, breathe slowly.' },
+      { type: 'timed', section: 'Cool-down', name: 'Glute stretch', seconds: 30, weekKeys: { seconds: 'cool' }, label: 'Stretch', figure: 'glute', minLevel: 4,
+        instruction: 'Ankle over the opposite knee, ease the hip open. Switch halfway.' },
+      { type: 'timed', section: 'Cool-down', name: 'Neck roll', seconds: 30, weekKeys: { seconds: 'cool' }, label: 'Stretch', figure: 'neckroll', minLevel: 7,
+        instruction: 'Slow half-circles, shoulders down and relaxed.' },
     ],
   },
 
@@ -1005,18 +1045,28 @@ window.Figures = (function () {
   }
 
   /* streak (localStorage 'coach.streak' = { count, last: local day key, best }); counts one per day, consecutive days */
-  function streakNow(now) { // the streak still alive today (0 if the last day done was before yesterday)
-    var d = LS.get('streak', null), y = new Date(now); y.setDate(y.getDate() - 1);
+  function streakNow(now, key) { // the streak still alive today (0 if the last day done was before yesterday)
+    var d = LS.get(key || 'streak', null), y = new Date(now); y.setDate(y.getDate() - 1);
     return d && (d.last === dayKey(now) || d.last === dayKey(y)) ? (d.count | 0) : 0;
   }
-  function streakBump(now) { // -> { count, added }
+  function streakBump(now, key) { // -> { count, added }
     now = now || new Date();
-    var d = LS.get('streak', null) || { count: 0, last: null, best: 0 };
+    var d = LS.get(key || 'streak', null) || { count: 0, last: null, best: 0 };
     if (d.last === dayKey(now)) return { count: d.count | 0, added: false };
-    d.count = streakNow(now) + 1; d.last = dayKey(now); d.best = Math.max(d.best | 0, d.count);
-    LS.set('streak', d);
+    d.count = streakNow(now, key) + 1; d.last = dayKey(now); d.best = Math.max(d.best | 0, d.count);
+    LS.set(key || 'streak', d);
     return { count: d.count, added: true };
   }
+
+  /* levels (sessions with levelByDone): level = 1 + floor(completed workouts / levelEvery), capped at maxLevel.
+     The completed count lives in localStorage 'coach.done.<session>'. ?level=N / ?w=N or the +/- buttons override it. */
+  function doneCount(key) { return Math.max(0, LS.get('done.' + key, 0) | 0); }
+  function autoLevel(key) {
+    var S = SESSIONS[key];
+    return S.levelByDone ? Math.min(S.maxLevel || 10, 1 + Math.floor(doneCount(key) / (S.levelEvery || 6))) : 1;
+  }
+  function maxWeek(key) { return SESSIONS[key].levelByDone ? (SESSIONS[key].maxLevel || 10) : 12; }
+  function weekWord(key) { return SESSIONS[key].levelByDone ? 'Level' : 'Week'; }
 
   function build(key, week, rctx) {
     var S = SESSIONS[key], steps = [], overview = [];
@@ -1042,6 +1092,7 @@ window.Figures = (function () {
 
     S.blocks.forEach(function (b) {
       var first = steps.length, r, s, i, phases;
+      if (b.minLevel && week < b.minLevel) return; // exercise/move that unlocks at a higher level
       switch (b.type) {
         case 'breathing': {
           var n = Math.max(1, Math.round(wv(b, 'seconds', holdTimes(S, week)) / (b.inhale + b.exhale)));
@@ -1106,11 +1157,12 @@ window.Figures = (function () {
         case 'timed': {
           phases = [];
           var introT = sectionIntro(b) + b.name;
+          var tSec = wv(b, 'seconds', holdTimes(S, week));
           if (ready) phases.push({ type: 'ready', dur: ready, label: 'Get ready', say: introT });
-          phases.push({ type: 'work', dur: b.seconds, label: 'Keep going', say: ready ? null : introT, tone: 'start', ticks: true, cues: b.cues });
+          phases.push({ type: 'work', dur: tSec, label: b.label || 'Keep going', say: ready ? null : introT, tone: 'start', ticks: true, cues: b.cues });
           add({ kind: 'timed', name: b.name, anim: b.anim || 'figure', figure: b.figure, instruction: b.instruction, phases: phases }, b);
           header(b);
-          overview.push({ title: b.name, detail: b.seconds + ' s', from: first, optional: b.optional });
+          overview.push({ title: b.name, detail: tSec + ' s', from: first, optional: b.optional });
           break;
         }
         case 'reflect': {
@@ -1155,6 +1207,40 @@ window.Figures = (function () {
           overview.push({ title: 'Rests', detail: (b.exercises.length > 1 ? b.restBetweenExercises + ' s between moves · ' : '') + b.restBetweenRounds + ' s between ' + RW.toLowerCase() + 's', muted: true });
           break;
         }
+        case 'tcircuit': { // timed circuit: every exercise is work seconds then rest seconds; level-driven (see workout)
+          var row = holdTimes(S, week), exs = [];
+          b.exercises.forEach(function (ex) {
+            if (ex.minLevel && week < ex.minLevel) return;
+            var v = ex.variants[ex.variants.length - 1];
+            for (var vi = 0; vi < ex.variants.length; vi++) if (week <= ex.variants[vi].upTo) { v = ex.variants[vi]; break; }
+            exs.push({ name: v.name, tip: v.tip, figure: ex.figure, work: v.cap ? Math.min(row.work, v.cap) : row.work });
+          });
+          var nEx = exs.length;
+          header(b, b.section + ' · ' + row.rounds + ' rounds × ' + nEx + ' moves');
+          for (r = 1; r <= row.rounds; r++) {
+            exs.forEach(function (ex, xi) {
+              var pre = (xi === 0 ? sectionIntro(b) + 'Round ' + r + ' of ' + row.rounds + '. ' : '');
+              phases = [];
+              if (r === 1 && xi === 0) phases.push({ type: 'ready', dur: 3, label: 'Get ready', say: pre + ex.name + '.' });
+              phases.push({ type: 'work', dur: ex.work, label: 'Work', say: (r === 1 && xi === 0) ? 'Go' : pre + ex.name + '. Go', tone: 'start', ticks: true, tip: ex.tip });
+              add({ kind: 'timed', name: ex.name, anim: 'figure', figure: ex.figure, instruction: ex.tip, round: r, rounds: row.rounds,
+                meta: 'Round ' + r + ' of ' + row.rounds + ' · Exercise ' + (xi + 1) + ' of ' + nEx, phases: phases }, b);
+              var nxt = xi < nEx - 1 ? exs[xi + 1] : (r < row.rounds ? exs[0] : null);
+              if (nxt) {
+                var secs = xi < nEx - 1 ? row.rest : row.roundRest;
+                add(restStep(secs, (xi < nEx - 1 ? 'Rest. ' : 'Round ' + r + ' done. Rest. '), {
+                  round: r, rounds: row.rounds, name: xi < nEx - 1 ? 'Rest' : 'Round ' + r + ' done · rest',
+                  instruction: 'Next: ' + nxt.name + '. ' + nxt.tip,
+                  meta: xi < nEx - 1 ? 'Round ' + r + ' of ' + row.rounds + ' · Next: exercise ' + (xi + 2) + ' of ' + nEx
+                    : 'Round ' + r + ' of ' + row.rounds + ' done · Next: round ' + (r + 1) + ' of ' + row.rounds
+                }), b);
+              }
+            });
+          }
+          exs.forEach(function (ex) { overview.push({ title: ex.name, detail: ex.work + ' s × ' + row.rounds + ' rounds' }); });
+          overview.push({ title: 'Rests', detail: row.rest + ' s between moves · ' + row.roundRest + ' s between rounds', muted: true });
+          break;
+        }
         case 'interval': {
           header(b, b.section + ' · ' + b.rounds + ' rounds');
           for (r = 1; r <= b.rounds; r++) {
@@ -1194,7 +1280,14 @@ window.Figures = (function () {
       if (o.header) o.seconds = steps.filter(function (s) { return s.sectionKey === o.key; }).reduce(function (a, s) { return a + s.dur; }, 0);
       else if (o.from !== undefined) {
         var nextFrom = steps.length;
-        for (var j = idx + 1; j < overview.length; j++) if (overview[j].from !== undefined) { nextFrom = overview[j].from; break; }
+        for (var j = idx + 1; j < overview.length; j++) {
+          if (overview[j].from !== undefined) { nextFrom = overview[j].from; break; }
+          if (overview[j].header) { // a new section starts: this row ends where that section's first step is
+            var hk = overview[j].key, fs = -1;
+            for (var q = 0; q < steps.length; q++) if (steps[q].sectionKey === hk) { fs = q; break; }
+            if (fs >= 0) { nextFrom = fs; break; }
+          }
+        }
         o.seconds = steps.slice(o.from, nextFrom).reduce(function (a, s) { return a + s.dur; }, 0);
       }
     });
@@ -1347,7 +1440,13 @@ window.Figures = (function () {
       LS.set('recallLast', new Date().toISOString());     // next afternoon run asks "since your last break (hh:mm)"
       LS.set('recallRot', (LS.get('recallRot', 0) | 0) + 1); // rotate prompt variants
     }
-    st.streakRes = S.streak ? streakBump(new Date()) : null;
+    st.streakRes = S.streak ? streakBump(new Date(), S.streakKey) : null;
+    st.levelRes = null;
+    if (S.levelByDone) { // one more completed workout; every levelEvery of them unlock the next level
+      var before = autoLevel(st.key);
+      LS.set('done.' + st.key, doneCount(st.key) + 1);
+      st.levelRes = { count: doneCount(st.key), before: before, after: autoLevel(st.key), played: st.week };
+    }
     renderDone();
     placeNotes('done');
     showScreen('done');
@@ -1376,6 +1475,7 @@ window.Figures = (function () {
     return Math.max(0, r);
   }
   function metaFor(step, ph) {
+    if (step.meta) return step.meta;
     var bits = [];
     if (step.round && !step.isRest) bits.push((step.roundWord || 'Round') + ' ' + step.round + ' of ' + step.rounds);
     if (step.sets > 1 || step.showSets) bits.push('Set ' + step.set + ' of ' + step.sets);
@@ -1423,7 +1523,7 @@ window.Figures = (function () {
     setText($('pNext'), stepLabel(st.steps[st.i + 1]));
     var total = st.plan.total, rem = remainingSec();
     $('pBar').style.width = (100 * (1 - rem / total)).toFixed(1) + '%';
-    setText($('pCount'), 'Step ' + (st.i + 1) + ' of ' + st.steps.length + (SESSIONS[st.key].usesWeek ? ' · Week ' + st.week : ''));
+    setText($('pCount'), 'Step ' + (st.i + 1) + ' of ' + st.steps.length + (SESSIONS[st.key].usesWeek ? ' · ' + weekWord(st.key) + ' ' + st.week : ''));
     setText($('pEta'), fmt(rem) + ' left');
     var icon = st.running ? PAUSE : PLAY;
     var path = $('playIcon').firstChild;
@@ -1594,7 +1694,10 @@ window.Figures = (function () {
   function setUrl() {
     var p = new URLSearchParams(location.search);
     p.set('s', st.key);
-    if (SESSIONS[st.key].usesWeek) p.set('w', st.week); else p.delete('w');
+    var US = SESSIONS[st.key];
+    p.delete('w'); p.delete('level');
+    if (US.levelByDone) { if (st.manual) p.set('level', st.week); }
+    else if (US.usesWeek) p.set('w', st.week);
     try { history.replaceState(null, '', location.pathname + '?' + p.toString()); } catch (e) {}
   }
   function renderHome() {
@@ -1606,22 +1709,43 @@ window.Figures = (function () {
       var b = document.createElement('button');
       b.className = 'pick'; b.type = 'button';
       b.setAttribute('aria-pressed', String(k === st.key));
-      var tot = build(k, k === st.key ? st.week : 1).total;
+      var tot = build(k, k === st.key ? st.week : SESSIONS[k].levelByDone ? autoLevel(k) : 1).total;
       b.innerHTML = '<span></span><small></small>';
       b.firstChild.textContent = SESSIONS[k].title;
       b.lastChild.textContent = fmtMin(tot);
-      b.addEventListener('click', function () { st.key = k; setUrl(); renderHome(); });
+      b.addEventListener('click', function () {
+        if (k === st.key) return;
+        st.weekBy[st.key] = st.week; st.manualBy[st.key] = st.manual;
+        st.key = k;
+        var Sk = SESSIONS[k];
+        st.manual = !!st.manualBy[k];
+        st.week = st.weekBy[k] != null && (!Sk.levelByDone || st.manual) ? st.weekBy[k] : Sk.levelByDone ? autoLevel(k) : (st.week || 1);
+        if (st.week > maxWeek(k)) st.week = maxWeek(k);
+        setUrl(); renderHome();
+      });
       picker.appendChild(b);
     });
     $('ovTitle').textContent = S.title;
-    var sk = S.streak ? streakNow(new Date()) : 0;
+    var sk = S.streak ? streakNow(new Date(), S.streakKey) : 0;
     $('ovSub').textContent = (plan.cue || S.subtitle || '') + (sk ? ' · 🔥 ' + sk + '-day streak' : '');
     $('ovTotal').textContent = fmtMin(plan.total);
     $('weekRow').hidden = !S.usesWeek;
+    $('ovLevel').hidden = !S.levelByDone;
     if (S.usesWeek) {
       var ht = holdTimes(S, st.week);
+      $('weekLabel').textContent = weekWord(st.key);
+      $('weekMinus').setAttribute('aria-label', 'Previous ' + weekWord(st.key).toLowerCase());
+      $('weekPlus').setAttribute('aria-label', 'Next ' + weekWord(st.key).toLowerCase());
       $('weekVal').textContent = st.week;
-      $('weekHold').textContent = ht.hold + ' s hold / ' + ht.relax + ' s relax';
+      if (S.levelByDone) {
+        var mx = S.maxLevel || 10, au = autoLevel(st.key), dn = doneCount(st.key);
+        $('weekHold').textContent = 'Level ' + st.week + ' · ' + fmtMin(plan.total);
+        var nl = '', pre = st.week !== au ? 'Your level: ' + au + ' (' + dn + ' done). ' : '';
+        if (au < mx) {
+          nl = 'Next: Level ' + (au + 1) + ' · ' + fmtMin(build(st.key, au + 1).total) + ' after ' + (S.levelEvery - dn % S.levelEvery) + ' more session' + (S.levelEvery - dn % S.levelEvery === 1 ? '' : 's') + ' (' + dn + ' done)';
+        } else nl = 'Peak level (Level ' + mx + ') · ' + dn + ' sessions done';
+        $('ovLevel').textContent = pre + nl;
+      } else $('weekHold').textContent = ht.hold + ' s hold / ' + ht.relax + ' s relax';
     }
     var list = $('ovList');
     list.innerHTML = '';
@@ -1739,6 +1863,15 @@ window.Figures = (function () {
     var sr = S.streak ? st.streakRes : null;
     $('dTitle').textContent = (S.doneTitle || 'Session complete') + (sr ? (sr.added ? ' Streak +1' : ' Streak ' + sr.count + ' (already counted today)') : '');
     $('dTime').textContent = S.title + ' · ' + fmt(st.realSec) + ' total' + (sr ? ' · 🔥 ' + sr.count + '-day streak' : '');
+    var lr = S.levelByDone ? st.levelRes : null, ex = $('dExtra');
+    ex.hidden = !lr;
+    if (lr) {
+      var line = 'Workout #' + lr.count + ' · Level ' + lr.played;
+      if (lr.after > lr.before) line += ' · 🎉 Level up! Next time: Level ' + lr.after + ' (~' + Math.round(build(st.key, lr.after).total / 60) + ' min)';
+      else if (lr.after < (S.maxLevel || 10)) line += ' · ' + (S.levelEvery - lr.count % S.levelEvery) + ' more to Level ' + (lr.after + 1);
+      else line += ' · peak level';
+      ex.textContent = line;
+    }
     $('dLogBox').hidden = !S.logReps;
     $('copyMsg').textContent = '';
     if (!S.logReps) return;
@@ -1868,8 +2001,8 @@ window.Figures = (function () {
   on('pVoice', 'click', function () { setPref('voice', !prefs.voice); });
   on('optSound', 'change', function (e) { setPref('sound', e.target.checked); });
   on('optVoice', 'change', function (e) { setPref('voice', e.target.checked); });
-  on('weekMinus', 'click', function () { st.week = Math.max(1, st.week - 1); setUrl(); renderHome(); });
-  on('weekPlus', 'click', function () { st.week = Math.min(12, st.week + 1); setUrl(); renderHome(); });
+  on('weekMinus', 'click', function () { st.week = Math.max(1, st.week - 1); st.manual = true; setUrl(); renderHome(); });
+  on('weekPlus', 'click', function () { st.week = Math.min(maxWeek(st.key), st.week + 1); st.manual = true; setUrl(); renderHome(); });
   document.addEventListener('keydown', function (e) {
     if ($('player').hidden || /INPUT|TEXTAREA/.test(document.activeElement && document.activeElement.tagName)) return;
     if (e.key === ' ') { e.preventDefault(); $('btnPlay').click(); }
@@ -1880,13 +2013,16 @@ window.Figures = (function () {
   /* ---------- init ---------- */
   var sParam = qs.get('s');
   st.key = SESSIONS[sParam] ? sParam : Object.keys(SESSIONS)[0];
-  st.week = Math.min(12, Math.max(1, parseInt(qs.get('w'), 10) || 1));
+  st.weekBy = {}; st.manualBy = {};
+  var wParam = parseInt(qs.get('level'), 10) || parseInt(qs.get('w'), 10) || 0; // ?level= or ?w= overrides the automatic level
+  st.manual = !!wParam && !!SESSIONS[st.key].levelByDone;
+  st.week = Math.min(maxWeek(st.key), Math.max(1, wParam || (SESSIONS[st.key].levelByDone ? autoLevel(st.key) : 1)));
   mountCues();
   syncToggles();
   showScreen('home');
 
   // debug/test hook
-  window.__coach = { st: st, build: build, speed: SPEED, summary: summaryText, recallContext: recallContext, streakBump: streakBump, streakNow: streakNow, notesText: notesText, voiceOn: voiceOn };
+  window.__coach = { st: st, build: build, speed: SPEED, summary: summaryText, recallContext: recallContext, streakBump: streakBump, streakNow: streakNow, autoLevel: autoLevel, doneCount: doneCount, notesText: notesText, voiceOn: voiceOn };
 })();
 </script>
 </body>

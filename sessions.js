@@ -13,13 +13,16 @@
  *                 roundWord: 'Set' (optional; says 'Set 1 of 3' instead of 'Round 1 of 3', e.g. single-exercise straight sets)
  *                 { name, reps: '15–20', est, figure, instruction, say }  -> rep-based, tap Done (say: extra spoken cue, round 1 only)
  *                 { name, seconds, figure, log: 'time', instruction } ] } -> timed
+ *   tcircuit  : { exercises: [{ name, figure, minLevel, variants: [{ upTo, name, tip, cap }] }] }  timed circuit driven by the session's
+ *               level row (rounds, work, rest, roundRest): 'Round X of Y · Exercise N of M', one tip per move (workout)
  *   interval  : { rounds, work, transition, setup: { seconds, label }, exercises: [{ name, figure, side, instruction }] }
  *   reflect   : { name, seconds, label, settle, instruction, prompts }   (calm 'glow' ring, soft chime, no ticks)
  *               prompts: [variants...] or { morning: [...], afternoon: [...] } (device clock: before 12:00 = morning).
  *               One variant is used per run and rotates each time the session is finished.
  *               '{since}' becomes 'lunch' or 'your last break (14:05)' (time of the last recall finished today).
  *
- * Session flags: voiceDefaultOff (voice silent until switched on), phaseTips (roomier tip line under the timer), cue ('{min}' = rounded minutes; shown on home, spoken first), streak (finish screen + localStorage
+ * Session flags: levelByDone + levelEvery + maxLevel (level from completed sessions in localStorage; ?level= overrides), streakKey, minLevel on any block,
+ *   voiceDefaultOff (voice silent until switched on), phaseTips (roomier tip line under the timer), cue ('{min}' = rounded minutes; shown on home, spoken first), streak (finish screen + localStorage
  *   streak counter), quiet (soft chime instead of beeps, voice off unless turned on for quiet sessions, quiet speech),
  *   notes (shows the on-device notes box), doneTitle, doneSay, foot.
  *
@@ -124,58 +127,91 @@ window.COACH_SESSIONS = {
   workout: {
     title: 'Home full-body',
     short: 'Full-body',
-    subtitle: 'Week 1 · bodyweight + a backpack',
-    logReps: true,
-    readySeconds: 3,
+    subtitle: 'Beginner full-body · no equipment',
+    // Habit loop: CUE (same time, same spot, N minutes) -> CRAVING (that strong, energised feeling) ->
+    // REWARD ("Done ✅ Streak +1", a workout streak and a session count, kept in localStorage).
+    cue: 'Same time, same spot, {min} minutes',
+    streak: true,
+    streakKey: 'streakWorkout',
+    phaseTips: true,
+    tip: 'Craving: feeling strong and energised afterwards. Reward: Done ✅ Streak +1.',
+    doneTitle: 'Done ✅',
+    doneSay: 'Done. Streak plus one. Nice work.',
+    readySeconds: 0,
+    usesWeek: true,
+    // Progression is by COMPLETED workouts (localStorage 'coach.done.workout'), not by calendar week:
+    // level = 1 + floor(completed / levelEvery), capped at maxLevel. ?level=N (or ?w=N) overrides it.
+    levelByDone: true,
+    levelEvery: 6,   // 6 sessions per level (about 2 weeks at 3 a week)
+    maxLevel: 10,
+    /*
+     * Level table (each row: maxWeek = the level). Keys: warm / cool = seconds per warm-up / cool-down move,
+     * rounds, work = seconds of work per exercise, rest = rest between exercises, roundRest = rest between rounds.
+     * Exercises have minLevel (added at that level) and variants (harder versions: name/tip/cap change at `upTo`).
+     * Approx. total time (warm-up + circuit + cool-down), the level table in README:
+     *   L1 10 · L2 12.5 · L3 15 · L4 17.5 · L5 20 · L6 23 · L7 26 · L8 29 · L9 32 · L10 35 min
+     * Each level adds a round, longer work, an extra exercise or a harder variation (about 2-3 minutes more).
+     */
+    holdByWeek: [
+      { maxWeek: 1,  warm: 30, cool: 30, rounds: 2, work: 30, rest: 10, roundRest: 20 },
+      { maxWeek: 2,  warm: 30, cool: 30, rounds: 2, work: 45, rest: 10, roundRest: 30 },
+      { maxWeek: 3,  warm: 30, cool: 40, rounds: 3, work: 30, rest: 10, roundRest: 25 },
+      { maxWeek: 4,  warm: 30, cool: 40, rounds: 3, work: 30, rest: 10, roundRest: 25 },
+      { maxWeek: 5,  warm: 40, cool: 40, rounds: 3, work: 35, rest: 10, roundRest: 30 },
+      { maxWeek: 6,  warm: 45, cool: 45, rounds: 3, work: 40, rest: 10, roundRest: 40 },
+      { maxWeek: 7,  warm: 45, cool: 40, rounds: 3, work: 35, rest: 15, roundRest: 40 },
+      { maxWeek: 8,  warm: 50, cool: 40, rounds: 3, work: 40, rest: 15, roundRest: 45 },
+      { maxWeek: 9,  warm: 50, cool: 45, rounds: 4, work: 30, rest: 15, roundRest: 45 },
+      { maxWeek: 99, warm: 50, cool: 45, rounds: 4, work: 35, rest: 15, roundRest: 60 },
+    ],
     blocks: [
-      { type: 'timed', section: 'Warm-up', name: 'March in place', seconds: 60, figure: 'march',
+      { type: 'timed', section: 'Warm-up', name: 'March in place', seconds: 30, weekKeys: { seconds: 'warm' }, label: 'Warm up', figure: 'march',
         instruction: 'Lift the knees, swing the arms, breathe easy.' },
-      { type: 'timed', section: 'Warm-up', name: 'Arm circles', seconds: 60, figure: 'armcircles',
-        instruction: 'Small circles growing bigger. Switch direction halfway.',
-        cues: [{ at: 30, say: 'Switch direction' }] },
-      { type: 'timed', section: 'Warm-up', name: 'Slow bodyweight squats', seconds: 60, figure: 'squat',
-        instruction: 'Slow and controlled. Chest up, knees over toes.' },
+      { type: 'timed', section: 'Warm-up', name: 'Arm circles', seconds: 30, weekKeys: { seconds: 'warm' }, label: 'Warm up', figure: 'armcircles',
+        instruction: 'Small circles growing bigger. Switch direction halfway.' },
+      { type: 'timed', section: 'Warm-up', name: 'Easy squats', seconds: 30, weekKeys: { seconds: 'warm' }, label: 'Warm up', figure: 'squat', minLevel: 3,
+        instruction: 'Slow and shallow: just wake the legs up.' },
+      { type: 'timed', section: 'Warm-up', name: 'Calf raises', seconds: 30, weekKeys: { seconds: 'warm' }, label: 'Warm up', figure: 'calfraise', minLevel: 6,
+        instruction: 'Up on your toes, down slowly. Hold a wall for balance.' },
       {
-        type: 'circuit', section: 'Circuit', rounds: 3, restBetweenExercises: 20, restBetweenRounds: 90,
+        type: 'tcircuit', section: 'Circuit',
         exercises: [
-          { name: 'Push-ups', reps: '8–12', est: 40, figure: 'pushup',
-            say: 'Option: hands on the wheel handles. Keep the wheels still.',
-            instruction: 'Option: hands on wheel handles; keep wheels still (against a wall, press straight down). Straight line head to heels; knees down if needed.' },
-          { name: 'Squats', reps: '15–20', est: 50, figure: 'squat',
-            instruction: 'Sit back and down, chest up, drive up through the heels.' },
-          { name: 'Backpack rows', reps: '10–12', est: 40, figure: 'row',
-            instruction: 'Hinge forward with a flat back and pull the bag to your ribs.' },
-          { name: 'Pike push-ups', reps: '6–10', est: 35, figure: 'pike',
-            instruction: 'Hips high, bend the elbows and lower your head toward the floor.' },
-          { name: 'Glute bridges', reps: '15', est: 40, figure: 'bridge',
-            instruction: 'Drive through the heels, squeeze the glutes at the top.' },
-          { name: 'Plank', seconds: 30, figure: 'plank', log: 'time',
-            instruction: 'Forearms down, body in one straight line, brace the core.' },
+          { name: 'Push-ups', figure: 'pushup', variants: [
+            { upTo: 2, name: 'Incline push-ups', tip: 'Hands on a sturdy chair or sofa edge, body straight, lower your chest slowly.' },
+            { upTo: 5, name: 'Knee push-ups', tip: 'Knees down, a straight line from knees to head, elbows about 45° from your body.' },
+            { upTo: 8, name: 'Push-ups', tip: 'One straight line from head to heels; drop to your knees if your form slips.' },
+            { upTo: 99, name: 'Slow push-ups', tip: '3 seconds down, 1 second up. Keep your belly tight.' } ] },
+          { name: 'Squats', figure: 'squat', variants: [
+            { upTo: 3, name: 'Squats', tip: 'Feet shoulder-width, sit back and down, chest up, knees over your toes.' },
+            { upTo: 6, name: 'Slow squats', tip: '3 seconds down, 1 second up. Heels stay flat.' },
+            { upTo: 99, name: 'Squats with a pause', tip: 'Pause 2 seconds at the bottom, then stand up tall.' } ] },
+          { name: 'Table rows', figure: 'row', variants: [
+            { upTo: 4, name: 'Table rows (knees bent)', tip: 'Lie under a sturdy table, grip the edge, pull your chest up to it. Check it is stable first.' },
+            { upTo: 99, name: 'Table rows', tip: 'Legs straight, body in a line: pull your chest to the edge, squeeze your shoulder blades.' } ] },
+          { name: 'Glute bridges', figure: 'bridge', variants: [
+            { upTo: 4, name: 'Glute bridges', tip: 'Heels down, lift your hips. Squeeze the pelvic floor gently at the top, as in a kegel, while keeping your breath flowing.' },
+            { upTo: 7, name: 'Glute bridges (2 s squeeze)', tip: 'Lift and squeeze 2 seconds. Squeeze the pelvic floor gently at the top, as in a kegel, while keeping your breath flowing.' },
+            { upTo: 99, name: 'Hip thrusts (shoulders on the sofa)', tip: 'Drive your hips up. Squeeze the pelvic floor gently at the top, as in a kegel, while keeping your breath flowing.' } ] },
+          { name: 'Reverse lunges', figure: 'lunge', variants: [
+            { upTo: 99, name: 'Reverse lunges', tip: 'Step back, lower the back knee toward the floor, front knee over the ankle. Alternate legs.' } ] },
+          { name: 'Plank', figure: 'plank', variants: [
+            { upTo: 4, name: 'Plank', cap: 25, tip: 'Forearms down, a straight line from head to heels. Drop to your knees if needed.' },
+            { upTo: 7, name: 'Plank', cap: 30, tip: 'Forearms down, squeeze your glutes and belly, breathe steadily.' },
+            { upTo: 99, name: 'Plank', tip: 'Forearms down, squeeze your glutes and belly, breathe steadily.' } ] },
+          { name: 'Ab wheel rollouts', figure: 'rollout', minLevel: 4, variants: [
+            { upTo: 99, name: 'Ab wheel rollouts (kneeling)', tip: 'Roll out only as far as your lower back stays flat, then pull back. Stop if it hurts.' } ] },
+          { name: 'Dead bugs', figure: 'legraise', minLevel: 7, variants: [
+            { upTo: 99, name: 'Dead bugs', tip: 'Back flat on the floor: lower the opposite arm and leg slowly, keep your lower back pressed down.' } ] },
         ],
       },
-      {
-        type: 'circuit', section: 'Core finisher: ab wheel', roundWord: 'Set', rounds: 3,
-        restBetweenExercises: 0, restBetweenRounds: 50,
-        exercises: [
-          { name: 'Ab wheel rollouts', reps: '6–8', est: 40, figure: 'rollout',
-            say: 'Roll out only as far as your lower back stays flat. Stop if your lower back hurts.',
-            instruction: 'Start on your knees (towel under them), brace. Roll out only as far as your lower back stays flat, then pull back with your abs. Stop if any lower-back pain.' },
-        ],
-      },
-      {
-        type: 'interval', section: 'Core finisher: chair', rounds: 2, work: 30, transition: 10,
-        setup: { seconds: 20, label: 'Grab a sturdy chair' },
-        exercises: [
-          { name: 'Seated knee tucks', figure: 'kneetuck',
-            instruction: 'Sit on the front edge, hold the seat, draw the knees in and extend.' },
-          { name: 'Seated leg raises', figure: 'legraise',
-            instruction: 'Lean back slightly, legs straight, lift and lower with control.' },
-          { name: 'Side crunch (left)', figure: 'sidecrunch', side: 'left',
-            instruction: 'Hands by your head, crunch down to the left side.' },
-          { name: 'Side crunch (right)', figure: 'sidecrunch', side: 'right',
-            instruction: 'Hands by your head, crunch down to the right side.' },
-        ],
-      },
+      { type: 'timed', section: 'Cool-down', name: 'Hamstring stretch', seconds: 30, weekKeys: { seconds: 'cool' }, label: 'Stretch', figure: 'hamstring',
+        instruction: 'Easy and long: no bouncing. Switch legs halfway.' },
+      { type: 'timed', section: 'Cool-down', name: 'Chest opener', seconds: 30, weekKeys: { seconds: 'cool' }, label: 'Stretch', figure: 'chestopener',
+        instruction: 'Hands behind you, open the chest, breathe slowly.' },
+      { type: 'timed', section: 'Cool-down', name: 'Glute stretch', seconds: 30, weekKeys: { seconds: 'cool' }, label: 'Stretch', figure: 'glute', minLevel: 4,
+        instruction: 'Ankle over the opposite knee, ease the hip open. Switch halfway.' },
+      { type: 'timed', section: 'Cool-down', name: 'Neck roll', seconds: 30, weekKeys: { seconds: 'cool' }, label: 'Stretch', figure: 'neckroll', minLevel: 7,
+        instruction: 'Slow half-circles, shoulders down and relaxed.' },
     ],
   },
 

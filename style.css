@@ -207,3 +207,5 @@ pre { white-space: pre-wrap; word-break: break-word; font: 13px/1.45 ui-monospac
   #player.calm .instr { display: flex; -webkit-line-clamp: unset; overflow: visible; }
   #player.calm .notes-head { display: none; }
 }
+.ov-level { font-size: 14px; margin: 8px 0 0; }
+#dExtra { margin-top: -6px; }
