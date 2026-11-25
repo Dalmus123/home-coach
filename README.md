@@ -70,3 +70,10 @@ Live: https://dalmus123.github.io/home-coach/?s=recall
   "Copy" puts them on the clipboard. Paper works just as well. Nothing leaves the device.
 - End screen: "Done. Back to work." plus today's notes.
 - Session data lives in `sessions.js` (block type `reflect`). Edit the prompt arrays there.
+
+## Session log (completion proof for the coach)
+When a session reaches its finish screen (or you leave it with Home / close the tab after starting), `app.js` (`Track`) POSTs one small record
+(session, variant, start/finish, duration, steps done/total, the Copy-summary text, per-set reps, device_id) to the `public.session_log` table of the
+Supabase project `home-coach` (ref `fohcauwhbyaitjydgrsq`). The publishable key in `app.js` is public by design: RLS allows **INSERT only**.
+Fire-and-forget; failed sends wait in localStorage `coach.logq` and retry on the next load / when back online. The easy/rest info screens log nothing.
+On localhost logging is off unless `?log=1`; local or `?speed=` runs use a `test-` device_id. Tests: `tests/test_log.py` (mocked; `--live` sends 2 real test rows).

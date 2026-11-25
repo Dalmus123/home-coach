@@ -1578,6 +1578,7 @@ window.Figures = (function () {
     st.i = Math.max(0, Math.min(st.steps.length - 1, i));
     enterStep();
     render();
+    Track.snapshot();
   }
   function recordLeaving(natural) {
     var step = cur();
@@ -1622,6 +1623,7 @@ window.Figures = (function () {
     var sameRun = st.started && !st.finished && st.plan && st.plan.key === st.key && st.plan.week === st.week && st.plan.short === !!st.short && st.plan.month === st.month;
     showScreen('player');
     if (fresh || !sameRun) {
+      Track.begin();
       var plan = build(st.key, st.week);
       plan.key = st.key; plan.week = st.week; plan.short = !!st.short; plan.month = st.month;
       st.plan = plan; st.steps = plan.steps;
@@ -1661,6 +1663,7 @@ window.Figures = (function () {
     renderDone();
     placeNotes('done');
     showScreen('done');
+    Track.complete();
   }
 
   /* strength: a move goes up its ladder when every set reached the top of the range (and RIR, if logged, was 1+) */
@@ -2287,7 +2290,7 @@ window.Figures = (function () {
     if (!confirm('Restart this session from the beginning?')) return;
     Voice.stop(); startSession(true);
   });
-  on('btnHome', 'click', function () { pause(); showScreen('home'); });
+  on('btnHome', 'click', function () { pause(); Track.partial(); showScreen('home'); });
   on('btnAgain', 'click', function () { showScreen('home'); });
   on('btnCopy', 'click', function () { copyText($('dText').textContent, $('copyMsg')); });
   on('btnCopyLast', 'click', function () {
@@ -2317,6 +2320,120 @@ window.Figures = (function () {
     else if (e.key === 'ArrowLeft') $('btnBack').click();
   });
 
+  /* ---------- session log (Forge's proof of completion) ----------
+     Sends one small record per finished (or abandoned) session to a private Supabase table (insert-only for the public key).
+     Fire-and-forget: never blocks or breaks a session; failed sends wait in localStorage 'coach.logq' and retry on the next load / when back online.
+     On localhost it is off unless ?log=1; test runs (localhost or ?speed other than 1) use a device_id starting with 'test-'. */
+  var LOG_URL = 'https://fohcauwhbyaitjydgrsq.supabase.co/rest/v1/session_log';
+  var LOG_KEY = 'sb_publishable_ane3QjoIiDmdxQMZuqB1NA_o42ETluB';
+  var isLocal = /^(localhost|127\.|\[::1\]|0\.0\.0\.0)/.test(location.hostname) || location.protocol === 'file:';
+  var logOn = !isLocal || qs.get('log') === '1';
+  var Track = {
+    flushing: false,
+    uuid: function () {
+      try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
+      return 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+    },
+    deviceId: function () {
+      var id = LS.get('deviceId', null);
+      if (!id) { id = 'd-' + Track.uuid(); LS.set('deviceId', id); }
+      return (isLocal || SPEED !== 1) && id.indexOf('test-') !== 0 ? 'test-' + id : id;
+    },
+    variant: function (S) {
+      if (S.strength) return st.short ? 'short' : 'full';
+      if (S.levelByDone) return 'level' + st.week;
+      if (S.usesWeek) return 'week' + st.week;
+      return null;
+    },
+    build: function (completed) {
+      var S = SESSIONS[st.key], real = st.steps.filter(function (s) { return !s.isRest; });
+      var done = real.filter(function (s) { return st.completed[s.index]; }).length;
+      var now = Date.now(), summary = '';
+      try { summary = summaryText(); } catch (e) {}
+      var logs = Object.keys(st.logs).map(function (k) { var l = st.logs[k]; return { ex: l.exKey || l.name, name: l.name, round: l.round, value: l.value, unit: l.unit, rir: l.rir }; });
+      var tz = ''; try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) {}
+      var runId = st.runId || (st.runId = Track.uuid());
+      return {
+        client_id: runId + ':' + (completed ? 'done' : 'part' + done),
+        run_id: runId,
+        client_ts: new Date(now).toISOString(),
+        tz: tz,
+        session: st.key,
+        variant: Track.variant(S),
+        started_at: new Date(st.startedAt || now).toISOString(),
+        finished_at: new Date(now).toISOString(),
+        duration_s: Math.max(0, Math.min(86400, Math.round(st.realSec || 0))),
+        completed: !!completed,
+        steps_done: done,
+        steps_total: real.length,
+        summary: String(summary).slice(0, 7900),
+        payload: { v: 1, week: st.week, month: st.month || null, short: !!st.short, via_today: !!st.viaToday, speed: SPEED, logs: logs, bumped: st.bumped || [] },
+        device_id: Track.deviceId(),
+        user_agent: String(navigator.userAgent || '').slice(0, 390)
+      };
+    },
+    queue: function () { var q = LS.get('logq', []); return Array.isArray(q) ? q : []; },
+    enqueue: function (rec) {
+      try {
+        if (!logOn) return;
+        var q = Track.queue().filter(function (r) { return r.client_id !== rec.client_id; });
+        q.push(rec); LS.set('logq', q.slice(-50));
+        Track.flush();
+      } catch (e) {}
+    },
+    flush: function () {
+      try {
+        if (!logOn || Track.flushing || typeof fetch !== 'function') return;
+        var q = Track.queue(); if (!q.length) return;
+        Track.flushing = true;
+        var rec = q[0];
+        fetch(LOG_URL, {
+          method: 'POST', keepalive: true,
+          headers: { 'Content-Type': 'application/json', apikey: LOG_KEY, Prefer: 'return=minimal' },
+          body: JSON.stringify(rec)
+        }).then(function (r) {
+          Track.flushing = false;
+          // 2xx = saved, 409 = already saved, other 4xx = the server will never accept it: drop. 5xx / 429: keep and retry later.
+          if (r.ok || r.status === 409 || (r.status >= 400 && r.status < 500 && r.status !== 429 && r.status !== 408)) {
+            LS.set('logq', Track.queue().filter(function (x) { return x.client_id !== rec.client_id; }));
+            Track.flush();
+          }
+        }).catch(function () { Track.flushing = false; });
+      } catch (e) { Track.flushing = false; }
+    },
+    begin: function () { // a fresh run starts (an abandoned previous run is logged first)
+      try {
+        if (st.started && !st.finished && st.runId && st.plan && st.plan.key === st.key) Track.partial();
+        st.runId = Track.uuid(); st.startedAt = Date.now(); st.bumped = []; st.lastPart = null;
+      } catch (e) {}
+    },
+    snapshot: function () { // keep the latest progress so a closed tab can be logged as unfinished on the next visit
+      try { if (logOn && st.started && !st.finished && st.runId) LS.set('activeRun', Track.build(false)); } catch (e) {}
+    },
+    partial: function () {
+      try {
+        if (!st.started || st.finished || !st.runId || !st.plan || st.plan.key !== st.key) return;
+        var rec = Track.build(false);
+        LS.set('activeRun', null);
+        if (st.lastPart === rec.client_id) return; // same progress already logged (Home, then the page closes)
+        st.lastPart = rec.client_id;
+        if (rec.steps_done > 0 || rec.duration_s >= 10) Track.enqueue(rec);
+      } catch (e) {}
+    },
+    complete: function () {
+      try { LS.set('activeRun', null); Track.enqueue(Track.build(true)); } catch (e) {}
+    },
+    recover: function () { // on load: an earlier run that was never finished or exited via Home
+      try {
+        var a = LS.get('activeRun', null);
+        if (a && a.client_id) { LS.set('activeRun', null); if (a.steps_done > 0 || a.duration_s >= 10) Track.enqueue(a); }
+        Track.flush();
+      } catch (e) {}
+    }
+  };
+  window.addEventListener('online', function () { Track.flush(); });
+  window.addEventListener('pagehide', function () { Track.partial(); });
+
   /* ---------- init ---------- */
   var sParam = qs.get('s');
   st.month = /^(dec|jan|feb)$/.test(qs.get('m') || '') ? qs.get('m') : monthKeyNow();
@@ -2334,9 +2451,10 @@ window.Figures = (function () {
   mountCues();
   syncToggles();
   showScreen('home');
+  Track.recover();
 
   // debug/test hook
-  window.__coach = { st: st, nairobiNow: nairobiNow, monthKeyNow: monthKeyNow, sessionForDay: sessionForDay, strengthRecords: strengthRecords, build: build, speed: SPEED, summary: summaryText, recallContext: recallContext, streakBump: streakBump, streakNow: streakNow, autoLevel: autoLevel, doneCount: doneCount, notesText: notesText, voiceOn: voiceOn };
+  window.__coach = { st: st, nairobiNow: nairobiNow, monthKeyNow: monthKeyNow, sessionForDay: sessionForDay, strengthRecords: strengthRecords, build: build, speed: SPEED, summary: summaryText, recallContext: recallContext, streakBump: streakBump, streakNow: streakNow, autoLevel: autoLevel, doneCount: doneCount, notesText: notesText, voiceOn: voiceOn, track: Track };
 })();
 </script>
 </body>
