@@ -209,3 +209,15 @@ pre { white-space: pre-wrap; word-break: break-word; font: 13px/1.45 ui-monospac
 }
 .ov-level { font-size: 14px; margin: 8px 0 0; }
 #dExtra { margin-top: -6px; }
+
+/* strength sessions (upper / lower) */
+.reps-input.rir { flex: 0 0 24%; }
+.reps-input.rir input { font-size: 26px; }
+#player .tip.prog { font-size: 12.5px; padding: 5px 10px; color: #cfe1d4; background: #14221b; border-color: #22392c; }
+.lad { display: flex; gap: 6px; margin-top: 6px; }
+.lad-btn { background: var(--surface2); border: 1px solid var(--line); border-radius: 10px; color: var(--muted); font-size: 12px; font-weight: 600; padding: 6px 10px; min-height: 32px; }
+.log-row .rir-in { width: 56px; margin-left: 6px; font-size: 15px; padding: 8px 6px; background: var(--surface2); border: 1px solid var(--line); border-radius: 10px; color: var(--text); text-align: right; }
+#player.strength .stage.fig { width: min(72vw, 25dvh, 300px); }
+#player.strength .reps-input { padding: 4px 10px; }
+.log-row > span:last-child { display: flex; align-items: center; flex: none; }
+.log-row > span:first-child { min-width: 0; }

@@ -5,7 +5,7 @@ Static, dependency-free guided workout player (HTML/CSS/JS, no build step, no CD
 - `index.html`, `style.css`, `figures.js`, `app.js`: the app
 - `sessions.js`: **all session definitions** (edit this to change routines; block types documented at the top)
 - `build.py`: inlines everything into one self-contained `dist/index.html`
-- `tests/`: headless-Chrome checks (Playwright): `test_app.py` (all sessions), `layout.py` (player fit), `test_recall.py` (recall), `test_pelvic.py`, `test_workout.py` (level table, level-up, streak; assertion-based)
+- `tests/`: headless-Chrome checks (Playwright): `test_app.py` (all sessions), `layout.py` (player fit), `test_recall.py` (recall), `test_pelvic.py`, `test_workout.py` (level table, level-up, streak; assertion-based), `test_strength.py` (upper/lower/today/short, logging, last time, ladder), `shots.py` (screenshots)
 
 ## URLs
 - `?s=pelvic&w=1`: Core & pelvic floor (3-5 min habit loop: cue "Same time, same spot, N minutes" → session → "Done ✅ Streak +1"; week 1-2: 5 s hold, 3-4: 8 s, 5+: 10 s; grows ~30-60 s every 2 weeks, ~3:20 → ~7:20 by week 11-12; voice off by default)
@@ -23,6 +23,17 @@ Static, dependency-free guided workout player (HTML/CSS/JS, no build step, no CD
   | Sessions needed | 0 | 6 | 12 | 18 | 24 | 30 | 36 | 42 | 48 | 54 |
 
   Edit the `holdByWeek` table and the exercise variants in `sessions.js` to change it.
+- `?s=upper` / `?s=lower`: **Phase 1 strength sessions, about 30 minutes** (Mon & Thu upper, Tue & Sat lower + core). Each opens with a ~3 min
+  warm-up (march, arm circles, one light round of the Level circuit at your workout level, capped at level 3), then three supersets (pairs),
+  3 sets each, 60-90 s rest after every set of a pair: upper = push-up + row, pike push-up + backpack curl, chair dips + plank; lower = squat + glute bridge,
+  reverse lunge + ab-wheel rollout, leg raise + hollow hold. Each move shows its target sets x reps, a cue and a progression step; log reps per set
+  (and RIR, reps in reserve, optional). Moves climb a ladder (e.g. incline -> floor -> decline -> archer push-ups): when every set reaches the top of the
+  range (and RIR is 1+ if logged) the next session starts one rung up; "Easier / Harder" buttons on the overview override it (`coach.var.<move>`).
+  "Last time" per move is kept in `coach.last.<session>` and shown on the overview and in the player. The month (Africa/Nairobi: Nov-Dec, Jan, Feb+) sets
+  hold times and rollout reps; `?m=dec|jan|feb` overrides. Finish screen: edit numbers, then Copy summary. The plan source is `sessions.js` (`pairs`).
+  Hidden **short day** (about 15 min, the top 3 moves, 2-3 sets): add `&short=1`, e.g. `?s=upper&short=1`. There is deliberately no toggle in the UI.
+- `?s=today`: picks the session by weekday in Africa/Nairobi: Mon/Thu upper, Tue/Sat lower, Wed/Fri `easy` (run-walk guidance + 3 min mobility),
+  Sun `rest` (rest screen). `?s=today&day=mon` previews a day. `?s=easy` and `?s=rest` also work; they are not in the picker. The overview has a "Today" link.
 - `?s=breaks`: 3-minute desk reset
 - `?s=recall`: Recall & consolidate, a 2-minute quiet 'zone out and recall' break (see below)
 - Debug: add `&speed=10` to run timers 10x faster.

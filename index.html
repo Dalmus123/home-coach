@@ -55,6 +55,8 @@
 
     <button class="cta" id="btnStart"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg><span id="btnStartLabel">Play</span></button>
     <button class="link-btn" id="btnStartOver" hidden>Start over from the beginning</button>
+    <p class="tip" id="shortNote" hidden>Short day (coach's call): the top 3 moves only, about 15 minutes.</p>
+    <button class="link-btn" id="btnToday" hidden></button>
     <div class="slot" id="notesHome"></div>
 
     <div class="card last" id="lastBox" hidden>
@@ -94,11 +96,14 @@
     <div class="clock" id="pClock">0</div>
     <div class="phase" id="pPhase"></div>
     <p class="instr" id="pInstr"></p>
+    <p class="tip prog" id="pProg" hidden></p>
     <div class="slot" id="notesPlayer"></div>
 
     <div class="reps-panel" id="repsPanel" hidden>
       <label class="reps-input"><span>Reps done <em>(optional)</em></span>
         <input type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="999" id="repsInput" placeholder="–"></label>
+      <label class="reps-input rir" id="rirWrap" hidden><span>RIR <em>(opt.)</em></span>
+        <input type="number" inputmode="numeric" pattern="[0-9]*" min="0" max="9" id="rirInput" placeholder="–" aria-label="Reps in reserve (optional)"></label>
       <button class="done-btn" id="btnDone">Done <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     </div>
 

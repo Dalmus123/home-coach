@@ -31,7 +31,7 @@
  *
  * Common optional block fields: section (group heading), optional (group name; adds a Skip button).
  * Figures available: march, armcircles, squat, pushup, row, pike, bridge, plank, crunch, kneetuck,
- *   legraise, sidecrunch, rollout (kneeling ab wheel), neckroll, shoulderroll, chestopener, hamstring, calfraise, lunge, glute.
+ *   legraise, sidecrunch, rollout (kneeling ab wheel), curl, dips, hollow, neckroll, shoulderroll, chestopener, hamstring, calfraise, lunge, glute.
  */
 window.COACH_SESSIONS = {
   pelvic: {
@@ -158,10 +158,10 @@ window.COACH_SESSIONS = {
       { maxWeek: 3,  warm: 30, cool: 40, rounds: 3, work: 30, rest: 10, roundRest: 25 },
       { maxWeek: 4,  warm: 30, cool: 40, rounds: 3, work: 30, rest: 10, roundRest: 25 },
       { maxWeek: 5,  warm: 40, cool: 40, rounds: 3, work: 35, rest: 10, roundRest: 30 },
-      { maxWeek: 6,  warm: 45, cool: 45, rounds: 3, work: 40, rest: 10, roundRest: 40 },
-      { maxWeek: 7,  warm: 45, cool: 40, rounds: 3, work: 35, rest: 15, roundRest: 40 },
-      { maxWeek: 8,  warm: 50, cool: 40, rounds: 3, work: 40, rest: 15, roundRest: 45 },
-      { maxWeek: 9,  warm: 50, cool: 45, rounds: 4, work: 30, rest: 15, roundRest: 45 },
+      { maxWeek: 6,  warm: 45, cool: 45, rounds: 3, work: 40, rest: 10, roundRest: 45 },
+      { maxWeek: 7,  warm: 45, cool: 40, rounds: 3, work: 35, rest: 15, roundRest: 45 },
+      { maxWeek: 8,  warm: 50, cool: 40, rounds: 3, work: 40, rest: 15, roundRest: 50 },
+      { maxWeek: 9,  warm: 50, cool: 45, rounds: 4, work: 30, rest: 15, roundRest: 50 },
       { maxWeek: 99, warm: 50, cool: 45, rounds: 4, work: 35, rest: 15, roundRest: 60 },
     ],
     blocks: [
@@ -294,4 +294,108 @@ window.COACH_SESSIONS = {
       ] },
     ],
   },
+  /*
+   * Phase 1 strength programme (see the plan: Mon/Thu upper, Tue/Sat lower + core). `strength: true` sessions are expanded by
+   * app.js (strengthBlocks) into: a ~3 min warm-up (march, arm circles, one light round of the Level circuit) + supersets.
+   *   pairs[]: { id, title, rest (s after each set of the pair), sets: {dec, jan, feb}, ex: [ exercise, ... ] }  (1-2 exercises)
+   *   exercise: { id, reps: '6-12' | { dec, jan, feb }, est (s per set), figure, ladder: [{ name, cue, figure? }, ...] (easy -> hard;
+   *               the rung is kept in localStorage 'coach.var.<id>' and moves up when every set reaches the top of the range),
+   *               prog (progression step shown under the cue) }   or timed: { id, seconds: { dec, jan, feb }, log: 'time', ... }
+   * Month (Africa/Nairobi): Nov-Dec = dec, Jan = jan, Feb on = feb; ?m=dec|jan|feb overrides. ?short=1 = 'Short day' (top 3 moves).
+   */
+  upper: {
+    title: 'Upper strength', short: 'Upper', subtitle: 'Mon & Thu · push, pull, arms',
+    strength: true, logReps: true, streak: true, streakKey: 'streakStrength', phaseTips: true,
+    doneTitle: 'Done ✅', doneSay: 'Upper session done. Nice work.',
+    foot: 'Pairs: do one set of each move back to back, then rest. Leave 1–2 reps in reserve (RIR) on every set.',
+    pairs: [
+      { id: 'A', title: 'Push-up and row', rest: 90, sets: { dec: 3, jan: 3, feb: 3 }, ex: [
+        { id: 'pushup', reps: '6–12', est: 50, figure: 'pushup',
+          ladder: [
+            { name: 'Incline push-ups', cue: 'Hands on a chair or sofa edge, body in one line, lower your chest slowly.' },
+            { name: 'Floor push-ups', cue: 'Head to heels in one line, elbows about 45° from your body.' },
+            { name: 'Decline push-ups', cue: 'Feet on a chair, hands on the floor, belly tight.' },
+            { name: 'Archer / forward-lean push-ups', cue: 'Lean forward over the hands, or shift to one arm each rep.' } ],
+          prog: 'Move up when every set hits 12 clean with 1–2 reps left.' },
+        { id: 'row', reps: '8–12', est: 50, figure: 'row',
+          ladder: [
+            { name: 'Table rows (knees bent)', cue: 'Lie under a sturdy table, pull your chest to the edge, squeeze the shoulder blades.' },
+            { name: 'Backpack bent-over rows', cue: 'Hinge forward, flat back, pull a loaded backpack to your belly. No table? Do these.' } ],
+          prog: 'Move up at 12 clean reps on every set: straighten the legs, then add backpack load.' } ] },
+      { id: 'B', title: 'Pike push-up and curl', rest: 90, sets: { dec: 3, jan: 3, feb: 3 }, ex: [
+        { id: 'pike', reps: '6–10', est: 50, figure: 'pike',
+          ladder: [
+            { name: 'Pike push-ups', cue: 'Hips high, lower your head toward the floor between your hands. Your shoulder builder.' },
+            { name: 'Feet-elevated pike push-ups', cue: 'Feet on a chair or bed, hips high, head between your hands.' } ],
+          prog: 'Elevate the feet when 10 reps get easy.' },
+        { id: 'curl', reps: '8–12', est: 45, figure: 'curl',
+          ladder: [ { name: 'Backpack curls', cue: 'Stand tall, elbows pinned to your sides, curl the bag. No swinging.' } ],
+          prog: 'Add books to the backpack when all sets reach 12.' } ] },
+      { id: 'C', title: 'Dips and plank', rest: 75, sets: { dec: 3, jan: 3, feb: 3 }, ex: [
+        { id: 'dip', reps: '8–12', est: 45, figure: 'dips',
+          ladder: [
+            { name: 'Chair dips', cue: 'Hands on a stable chair, feet out, lower until the elbows are about 90°. Shoulders sore? Do close-grip push-ups instead.' },
+            { name: 'Chair dips (feet out, legs straight)', cue: 'Legs straight and further out, elbows about 90°, no shoulder pain.' } ],
+          prog: 'Move up when all sets reach 12 clean.' },
+        { id: 'plank', seconds: { dec: 25, jan: 30, feb: 40 }, log: 'time', figure: 'plank',
+          ladder: [ { name: 'Plank', cue: 'Forearms down, squeeze glutes and belly, breathe steadily. Drop to your knees if needed.' } ],
+          prog: 'Add 5 s a week toward 40 s.' } ] },
+    ],
+  },
+
+  lower: {
+    title: 'Lower + core', short: 'Lower + core', subtitle: 'Tue & Sat · legs, glutes, abs',
+    strength: true, logReps: true, streak: true, streakKey: 'streakStrength', phaseTips: true,
+    doneTitle: 'Done ✅', doneSay: 'Lower and core session done. Nice work.',
+    foot: 'Pairs: do one set of each move back to back, then rest. Leave 1–2 reps in reserve (RIR) on every set.',
+    pairs: [
+      { id: 'A', title: 'Squat and glute bridge', rest: 90, sets: { dec: 3, jan: 3, feb: 3 }, ex: [
+        { id: 'squat', reps: '8–12', est: 50, figure: 'squat',
+          ladder: [
+            { name: 'Bodyweight squats', cue: 'Sit back, chest up, heels down.' },
+            { name: 'Backpack squats', cue: 'Backpack on your shoulders or held in front. Sit back, chest up, heels down.' } ],
+          prog: 'Add a backpack when 12 reps are easy on every set.' },
+        { id: 'bridge', reps: '8–12', est: 45, figure: 'bridge',
+          ladder: [
+            { name: 'Glute bridges', cue: 'Heels down, squeeze at the top for a second.' },
+            { name: 'Sofa hip thrusts', cue: 'Shoulders on the sofa, drive the hips up, squeeze at the top.' },
+            { name: 'Backpack hip thrusts', cue: 'Backpack on your hips, shoulders on the sofa, squeeze at the top.' } ],
+          prog: 'Move up at 12 clean reps on every set.' } ] },
+      { id: 'B', title: 'Lunge and rollout', rest: 90, sets: { dec: 3, jan: 3, feb: 3 }, ex: [
+        { id: 'lunge', reps: '8–10 / leg', est: 60, figure: 'lunge',
+          ladder: [
+            { name: 'Reverse lunges', cue: 'Step back, front knee over the ankle. Count both legs as one set.' },
+            { name: 'Backpack reverse lunges', cue: 'Hold the backpack at your chest, step back, front knee over the ankle.' } ],
+          prog: 'Hold a backpack once 10 reps per leg are easy.' },
+        { id: 'rollout', reps: { dec: '8', jan: '8–10', feb: '8–10' }, est: 45, figure: 'rollout',
+          ladder: [ { name: 'Ab-wheel kneeling rollouts', cue: 'Roll out only as far as the lower back stays flat, then pull back. Stop if it hurts.' } ],
+          prog: 'Lengthen the range a little over the months; never chase distance.' } ] },
+      { id: 'C', title: 'Leg raises and hollow hold', rest: 75, sets: { dec: 3, jan: 3, feb: 3 }, ex: [
+        { id: 'legraise', reps: '8–12', est: 45, figure: 'legraise',
+          ladder: [ { name: 'Lying leg raises', cue: 'Lower back pressed into the floor. Bend the knees if the back peels up.' } ],
+          prog: 'Straighten the legs as they get easier.' },
+        { id: 'hollow', seconds: { dec: 20, jan: 30, feb: 40 }, log: 'time', figure: 'hollow',
+          ladder: [ { name: 'Hollow hold', cue: 'Lower back down, ribs in, arms and legs long. Shorten the lever if you shake.' } ],
+          prog: 'Toward 40 s by February.' } ] },
+    ],
+  },
+
+  easy: {
+    title: 'Easy day', short: 'Easy day', subtitle: 'Wed & Fri · run-walk + mobility', hidden: true,
+    doneTitle: 'Done ✅', doneSay: 'Mobility done. Nice work.',
+    tip: 'First: 20–25 min run-walk (2 min easy running, 1 min walking, repeat) or a brisk 15–20 min walk. Wait until the flu is clearly gone before running. In Garissa go by 6–6:30 AM. Then do this 3-minute mobility.',
+    blocks: [
+      { type: 'timed', name: 'Shoulder rolls', seconds: 40, figure: 'shoulderroll', instruction: 'Up, back and down in big slow circles.' },
+      { type: 'timed', name: 'Chest opener', seconds: 40, figure: 'chestopener', instruction: 'Hands behind you, open the chest, breathe slowly.' },
+      { type: 'timed', name: 'Hamstring stretch', seconds: 40, figure: 'hamstring', instruction: 'Easy and long, no bouncing. Switch legs halfway.' },
+      { type: 'timed', name: 'Glute stretch', seconds: 40, figure: 'glute', instruction: 'Ankle over the opposite knee, ease the hip open. Switch halfway.' },
+      { type: 'timed', name: 'Calf raises', seconds: 30, figure: 'calfraise', instruction: 'Up on your toes, down slowly. Hold a wall for balance.' },
+    ],
+  },
+
+  rest: {
+    title: 'Rest day', short: 'Rest day', subtitle: 'Sunday · full rest', hidden: true, noPlay: true, blocks: [],
+    tip: 'Full rest: muscle grows while you recover. Walk only if you feel like it (in Garissa, full rest: heat makes this non-negotiable). Eat about 2,450 kcal with 95–100 g protein, and be in bed by 10:30 PM. Next session: Monday, Upper strength.',
+  },
+
 };

@@ -141,7 +141,7 @@
       instruction: 'Shake it out and breathe easy.',
       phases: [{ type: 'rest', dur: seconds, label: 'Rest', say: say, tone: 'relax', ticks: true }]
     };
-    for (var k in extra) s[k] = extra[k];
+    for (var k in extra) if (extra[k] !== undefined) s[k] = extra[k];
     return s;
   }
 
@@ -191,9 +191,62 @@
   function maxWeek(key) { return SESSIONS[key].levelByDone ? (SESSIONS[key].maxLevel || 10) : 12; }
   function weekWord(key) { return SESSIONS[key].levelByDone ? 'Level' : 'Week'; }
 
+  /* ---------- strength programme helpers (upper / lower, see sessions.js) ---------- */
+  var DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'], DAY_NAMES = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
+  function nairobiNow() { // weekday + month as they are in Africa/Nairobi (UTC+3, no DST), whatever the device clock says
+    var d = new Date(Date.now() + 3 * 3600 * 1000);
+    return { day: DAYS[d.getUTCDay()], month: d.getUTCMonth() + 1, year: d.getUTCFullYear() };
+  }
+  function monthKeyNow() { var n = nairobiNow(); return n.month === 1 ? 'jan' : n.month >= 2 && n.month <= 6 ? 'feb' : 'dec'; }
+  function sessionForDay(day) { return { mon: 'upper', thu: 'upper', tue: 'lower', sat: 'lower', wed: 'easy', fri: 'easy', sun: 'rest' }[day] || 'upper'; }
+  function topReps(r) { var m = String(r).match(/\d+/g); return m ? parseInt(m[m.length - 1], 10) : 0; }
+  function ladderIdx(ex) { var i = LS.get('var.' + ex.id, 0) | 0; return Math.max(0, Math.min(ex.ladder.length - 1, i)); }
+  function byMonth(v, month) { return v && typeof v === 'object' ? (v[month] != null ? v[month] : v.dec) : v; }
+  function strengthLast(key) { return LS.get('last.' + key, null); }
+  function fmtLast(rec) {
+    if (!rec || !rec.vals || !rec.vals.length) return '';
+    var t = rec.vals.map(function (v) { return v === '' || v == null ? '–' : v; }).join(' / ') + (rec.unit === 's' ? ' s' : ' reps');
+    if (rec.rir && rec.rir.some(function (r) { return r !== '' && r != null; })) t += ' · RIR ' + rec.rir.map(function (r) { return r === '' || r == null ? '–' : r; }).join('/');
+    return t;
+  }
+  /* expand a strength session into player blocks: 3 min warm-up, then supersets (or the hidden short day: top 3 moves) */
+  function strengthBlocks(key, S) {
+    var month = st.month || monthKeyNow(), short = !!st.short, last = strengthLast(key), blocks = [];
+    blocks.push({ type: 'timed', section: 'Warm-up', name: 'March in place', seconds: 15, label: 'Warm up', figure: 'march', instruction: 'Lift the knees, swing the arms, breathe easy.' });
+    blocks.push({ type: 'timed', section: 'Warm-up', name: 'Arm circles', seconds: 15, label: 'Warm up', figure: 'armcircles', instruction: 'Small circles growing bigger. Switch direction halfway.' });
+    blocks.push({ type: 'tcircuit', section: 'Warm-up', from: 'workout', limit: 6, compact: true, maxLevel: 3, row: { rounds: 1, work: 18, rest: 6, roundRest: 0 } });
+    var groups = [];
+    if (short) { // top 3 exercises: first pair x 3 sets, then the next move alone x 2 sets
+      var all = []; S.pairs.forEach(function (pr) { pr.ex.forEach(function (e) { all.push({ pr: pr, e: e }); }); });
+      var p0 = S.pairs[0];
+      groups.push({ title: p0.title, rest: 60, sets: 3, ex: p0.ex });
+      var third = all[p0.ex.length];
+      if (third) groups.push({ title: third.e.ladder[ladderIdx(third.e)].name, rest: 60, sets: 2, ex: [third.e] });
+    } else {
+      S.pairs.forEach(function (pr) { groups.push({ title: pr.title, rest: pr.rest, sets: byMonth(pr.sets, month), ex: pr.ex, id: pr.id }); });
+    }
+    groups.forEach(function (g, gi) {
+      var nextG = groups[gi + 1];
+      blocks.push({
+        type: 'circuit', strength: true, section: (g.id && g.ex.length > 1 ? 'Pair ' + g.id + ': ' : '') + g.title.replace(/ and /g, ' + '),
+        sectionSay: (g.id && g.ex.length > 1 ? 'Pair ' + g.id + '. ' : '') + g.title,
+        rounds: g.sets, roundWord: 'Set', restBetweenExercises: 15, restBetweenRounds: g.rest,
+        restAfter: nextG ? g.rest : 0, nextName: nextG ? nextG.title : '',
+        exercises: g.ex.map(function (e) {
+          var v = e.ladder[ladderIdx(e)], rec = last && last.ex && last.ex[e.id];
+          var o = { name: v.name, figure: v.figure || e.figure, instruction: v.cue, progress: e.prog, exKey: e.id, last: rec ? fmtLast(rec) : '', ladder: e.ladder.length > 1 };
+          if (e.seconds) { o.seconds = byMonth(e.seconds, month); o.log = 'time'; o.targetText = o.seconds + ' s'; }
+          else { o.reps = byMonth(e.reps, month); o.est = e.est || 45; o.top = topReps(o.reps); }
+          return o;
+        })
+      });
+    });
+    return blocks;
+  }
+
   function build(key, week, rctx) {
     var S = SESSIONS[key], steps = [], overview = [];
-    var nPrompts = S.blocks.filter(function (b) { return b.type === 'reflect' && !b.settle; }).length, promptNo = 0;
+    var nPrompts = (S.blocks || []).filter(function (b) { return b.type === 'reflect' && !b.settle; }).length, promptNo = 0;
     var ready = S.readySeconds || 0, lastSection = null, lastOvHeader = null, seenOptional = {};
     function add(step, b) {
       step.section = step.section || b.section || b.optional || '';
@@ -213,7 +266,8 @@
       return '';
     }
 
-    S.blocks.forEach(function (b) {
+    var BLOCKS = S.strength ? strengthBlocks(key, S) : S.blocks;
+    BLOCKS.forEach(function (b, bi) {
       var first = steps.length, r, s, i, phases;
       if (b.minLevel && week < b.minLevel) return; // exercise/move that unlocks at a higher level
       switch (b.type) {
@@ -306,8 +360,9 @@
           header(b, b.section + ' · ' + b.rounds + ' ' + RW.toLowerCase() + 's');
           for (r = 1; r <= b.rounds; r++) {
             b.exercises.forEach(function (ex, xi) {
-              var pre = (xi === 0 ? sectionIntro(b) + RW + ' ' + r + ' of ' + b.rounds + '. ' : '');
+              var pre = (xi === 0 ? (b.sectionSay && b.section !== lastSection ? (lastSection = b.section, b.sectionSay + '. ') : sectionIntro(b)) + RW + ' ' + r + ' of ' + b.rounds + '. ' : '');
               var base = { name: ex.name, figure: ex.figure, anim: 'figure', instruction: ex.instruction, round: r, rounds: b.rounds, roundWord: RW, logKey: 'r' + r + ':' + ex.name };
+              if (b.strength) { base.progress = ex.progress; base.last = ex.last; base.exKey = ex.exKey; base.top = ex.top; base.strength = true; base.pairSize = b.exercises.length; }
               if (ex.reps) {
                 base.kind = 'reps'; base.target = ex.reps; base.est = ex.est || 40; base.log = 'reps';
                 base.say = pre + ex.name + '. ' + spoken(ex.reps) + ' reps. ' + (ex.say && r === 1 ? ex.say + ' ' : '') + 'Tap done when finished.';
@@ -320,22 +375,33 @@
               }
               add(base, b);
               var lastEx = xi === b.exercises.length - 1;
-              if (!lastEx) add(restStep(b.restBetweenExercises, 'Rest ' + b.restBetweenExercises + ' seconds.', { round: r, rounds: b.rounds, roundWord: RW }), b);
-              else if (r < b.rounds) add(restStep(b.restBetweenRounds, RW + ' ' + r + ' complete. Rest ' + b.restBetweenRounds + ' seconds.', { round: r, rounds: b.rounds, roundWord: RW, name: RW + ' rest' }), b);
+              var nxtEx = !lastEx ? b.exercises[xi + 1] : (r < b.rounds ? b.exercises[0] : null);
+              if (!lastEx) add(restStep(b.restBetweenExercises, b.strength ? 'Switch. Next: ' + nxtEx.name + '.' : 'Rest ' + b.restBetweenExercises + ' seconds.',
+                { round: r, rounds: b.rounds, roundWord: RW, name: b.strength ? 'Switch' : 'Rest', instruction: b.strength ? 'Next: ' + nxtEx.name + '. ' + nxtEx.instruction : undefined }), b);
+              else if (r < b.rounds) add(restStep(b.restBetweenRounds, RW + ' ' + r + ' complete. Rest ' + b.restBetweenRounds + ' seconds.',
+                { round: r, rounds: b.rounds, roundWord: RW, name: RW + ' rest', instruction: b.strength ? 'Next: ' + RW.toLowerCase() + ' ' + (r + 1) + ' · ' + nxtEx.name + '. ' + nxtEx.instruction : undefined }), b);
+              else if (b.restAfter) add(restStep(b.restAfter, 'Done. Rest ' + b.restAfter + ' seconds. Next: ' + b.nextName + '.',
+                { round: r, rounds: b.rounds, roundWord: RW, name: 'Rest · next: ' + b.nextName, instruction: 'Shake it out and breathe. Next up: ' + b.nextName + '.' }), b);
             });
           }
           b.exercises.forEach(function (ex) {
-            overview.push({ title: ex.name, detail: ex.reps ? ex.reps + ' reps' : ex.seconds + ' s hold' });
+            var d = ex.reps ? b.rounds + ' × ' + ex.reps + (b.strength ? '' : ' reps') : (b.strength ? b.rounds + ' × ' : '') + ex.seconds + ' s' + (b.strength ? '' : ' hold');
+            if (ex.last) d += ' · last ' + ex.last;
+            overview.push({ title: ex.name, detail: d, ladder: ex.ladder ? ex.exKey : null });
           });
-          overview.push({ title: 'Rests', detail: (b.exercises.length > 1 ? b.restBetweenExercises + ' s between moves · ' : '') + b.restBetweenRounds + ' s between ' + RW.toLowerCase() + 's', muted: true });
+          if (b.strength) overview.push({ title: 'Rest', detail: b.restBetweenRounds + ' s after each set of the pair', muted: true });
+          else overview.push({ title: 'Rests', detail: (b.exercises.length > 1 ? b.restBetweenExercises + ' s between moves · ' : '') + b.restBetweenRounds + ' s between ' + RW.toLowerCase() + 's', muted: true });
           break;
         }
         case 'tcircuit': { // timed circuit: every exercise is work seconds then rest seconds; level-driven (see workout)
-          var row = holdTimes(S, week), exs = [];
-          b.exercises.forEach(function (ex) {
-            if (ex.minLevel && week < ex.minLevel) return;
+          var tS = b.from ? SESSIONS[b.from] : S, tWeek = b.from ? Math.min(b.maxLevel || 99, autoLevel(b.from)) : week;
+          var row = b.row || holdTimes(tS, tWeek), exs = [];
+          var tEx = b.exercises || tS.blocks.filter(function (x) { return x.type === 'tcircuit'; })[0].exercises;
+          tEx.forEach(function (ex) {
+            if (b.limit && exs.length >= b.limit) return;
+            if (ex.minLevel && tWeek < ex.minLevel) return;
             var v = ex.variants[ex.variants.length - 1];
-            for (var vi = 0; vi < ex.variants.length; vi++) if (week <= ex.variants[vi].upTo) { v = ex.variants[vi]; break; }
+            for (var vi = 0; vi < ex.variants.length; vi++) if (tWeek <= ex.variants[vi].upTo) { v = ex.variants[vi]; break; }
             exs.push({ name: v.name, tip: v.tip, figure: ex.figure, work: v.cap ? Math.min(row.work, v.cap) : row.work });
           });
           var nEx = exs.length;
@@ -360,8 +426,12 @@
               }
             });
           }
-          exs.forEach(function (ex) { overview.push({ title: ex.name, detail: ex.work + ' s × ' + row.rounds + ' rounds' }); });
-          overview.push({ title: 'Rests', detail: row.rest + ' s between moves · ' + row.roundRest + ' s between rounds', muted: true });
+          if (b.compact) {
+            overview.push({ title: 'Level circuit, 1 light round', detail: nEx + ' moves · ' + row.work + ' s work / ' + row.rest + ' s rest · ' + exs.map(function (x) { return x.name.replace(/ \(.*\)/, ''); }).join(', '), from: first });
+          } else {
+            exs.forEach(function (ex) { overview.push({ title: ex.name, detail: ex.work + ' s × ' + row.rounds + ' rounds' }); });
+            overview.push({ title: 'Rests', detail: row.rest + ' s between moves · ' + row.roundRest + ' s between rounds', muted: true });
+          }
           break;
         }
         case 'interval': {
@@ -427,6 +497,7 @@
     var bits = [s.name];
     if (s.sets > 1) bits.push('Set ' + s.set + ' of ' + s.sets);
     if (s.kind === 'reps') bits.push(s.target + ' reps');
+    else if (s.strength && s.log === 'time') bits.push(s.phases[s.phases.length - 1].dur + ' s hold');
     else bits.push(fmt(s.dur));
     return bits.join(' · ');
   }
@@ -487,6 +558,7 @@
       Voice.say(step.say, true);
       var lg = st.logs[step.logKey];
       $('repsInput').value = lg && lg.value !== '' && lg.value != null ? lg.value : '';
+      $('rirInput').value = lg && lg.rir !== '' && lg.rir != null ? lg.rir : '';
     } else enterPhase();
   }
   function goTo(i) {
@@ -502,14 +574,14 @@
       var secs = 0, ph = curPhase();
       if (natural) secs = step.phases[step.phases.length - 1].dur;
       else if (ph && ph.type === 'work') secs = Math.round(st.pt);
-      if (natural || secs > 0) st.logs[step.logKey] = { name: step.name, round: step.round, value: secs, unit: 's' };
+      if (natural || secs > 0) st.logs[step.logKey] = { name: step.name, round: step.round, value: secs, unit: 's', exKey: step.exKey, rir: '' };
     }
     if (natural) st.completed[step.index] = true;
   }
   function saveReps(step) {
-    var v = $('repsInput').value.trim();
+    var v = $('repsInput').value.trim(), rv = $('rirInput').value.trim();
     var prev = st.logs[step.logKey];
-    if (v !== '' || !prev) st.logs[step.logKey] = { name: step.name, round: step.round, value: v === '' ? '' : Math.max(0, parseInt(v, 10) || 0), unit: 'reps' };
+    if (v !== '' || !prev) st.logs[step.logKey] = { name: step.name, round: step.round, value: v === '' ? '' : Math.max(0, parseInt(v, 10) || 0), unit: 'reps', exKey: step.exKey, rir: step.strength && rv !== '' ? Math.min(9, Math.max(0, parseInt(rv, 10) || 0)) : '' };
   }
   function completeStep() {
     var step = cur();
@@ -534,11 +606,11 @@
   function startSession(fresh) {
     Sound.unlock();
     Voice.unlock();
-    var sameRun = st.started && !st.finished && st.plan && st.plan.key === st.key && st.plan.week === st.week;
+    var sameRun = st.started && !st.finished && st.plan && st.plan.key === st.key && st.plan.week === st.week && st.plan.short === !!st.short && st.plan.month === st.month;
     showScreen('player');
     if (fresh || !sameRun) {
       var plan = build(st.key, st.week);
-      plan.key = st.key; plan.week = st.week;
+      plan.key = st.key; plan.week = st.week; plan.short = !!st.short; plan.month = st.month;
       st.plan = plan; st.steps = plan.steps;
       st.logs = {}; st.completed = {}; st.realSec = 0;
       st.started = true; st.finished = false;
@@ -547,6 +619,7 @@
       $('pTip').hidden = !tip; if (tip) $('pTip').textContent = tip;
       $('player').classList.toggle('calm', !!SESSIONS[st.key].quiet);
       $('player').classList.toggle('tips', !!SESSIONS[st.key].phaseTips);
+      $('player').classList.toggle('strength', !!SESSIONS[st.key].strength);
       st.running = true; st.last = performance.now();
       goTo(0);
     }
@@ -559,10 +632,12 @@
     var S = SESSIONS[st.key];
     Sound.play(S.quiet ? 'chime' : 'done');
     Voice.say(S.doneSay || 'Session complete. Nice work.', false);
-    if (S.blocks.some(function (b) { return b.type === 'reflect'; })) {
+    if ((S.blocks || []).some(function (b) { return b.type === 'reflect'; })) {
       LS.set('recallLast', new Date().toISOString());     // next afternoon run asks "since your last break (hh:mm)"
       LS.set('recallRot', (LS.get('recallRot', 0) | 0) + 1); // rotate prompt variants
     }
+    st.bumped = [];
+    if (S.strength) st.bumped = ladderBumps();
     st.streakRes = S.streak ? streakBump(new Date(), S.streakKey) : null;
     st.levelRes = null;
     if (S.levelByDone) { // one more completed workout; every levelEvery of them unlock the next level
@@ -573,6 +648,24 @@
     renderDone();
     placeNotes('done');
     showScreen('done');
+  }
+
+  /* strength: a move goes up its ladder when every set reached the top of the range (and RIR, if logged, was 1+) */
+  function ladderBumps() {
+    var S = SESSIONS[st.key], out = [], seen = {};
+    st.steps.forEach(function (s) {
+      if (!s.strength || s.kind !== 'reps' || seen[s.exKey]) return;
+      seen[s.exKey] = true;
+      var sets = st.steps.filter(function (x) { return x.exKey === s.exKey && x.kind === 'reps'; });
+      var ok = sets.every(function (x) { var lg = st.logs[x.logKey]; return lg && lg.value !== '' && lg.value >= x.top && (lg.rir === '' || lg.rir == null || lg.rir >= 1); });
+      if (!ok) return;
+      S.pairs.forEach(function (pr) { pr.ex.forEach(function (e) {
+        if (e.id !== s.exKey) return;
+        var i = ladderIdx(e);
+        if (i < e.ladder.length - 1) { LS.set('var.' + e.id, i + 1); out.push(e.ladder[i + 1].name); }
+      }); });
+    });
+    return out;
   }
 
   /* ---------- player rendering ---------- */
@@ -640,6 +733,10 @@
     }
     setText($('pInstr'), (!isReps && ep && ep.tip) || step.instruction || '');
     $('repsPanel').hidden = !isReps;
+    $('rirWrap').hidden = !(isReps && step.strength);
+    var pg = $('pProg'), pgt = '';
+    if (step.strength) pgt = (step.last ? 'Last time: ' + step.last + '. ' : 'First time: no last numbers yet. ') + (step.progress ? 'Progress: ' + step.progress : '');
+    pg.hidden = !pgt; setText(pg, pgt);
     var sk = $('btnSkipGroup');
     sk.hidden = !step.optional;
     if (step.optional) setText(sk, 'Skip ' + step.optional.replace(/^optional\s+/i, '') + ' →');
@@ -823,12 +920,28 @@
     else if (US.usesWeek) p.set('w', st.week);
     try { history.replaceState(null, '', location.pathname + '?' + p.toString()); } catch (e) {}
   }
+  function selectKey(k) {
+    if (k === st.key) return;
+    st.weekBy[st.key] = st.week; st.manualBy[st.key] = st.manual;
+    st.key = k;
+    var Sk = SESSIONS[k];
+    st.manual = !!st.manualBy[k];
+    st.week = st.weekBy[k] != null && (!Sk.levelByDone || st.manual) ? st.weekBy[k] : Sk.levelByDone ? autoLevel(k) : (st.week || 1);
+    if (st.week > maxWeek(k)) st.week = maxWeek(k);
+    setUrl(); renderHome();
+  }
+  var MONTH_NOTES = {
+    dec: 'December: learn the moves. Leave about 2 reps in reserve. Push-ups stay on the incline; add backpack load only in the last two weeks, and only if form is clean.',
+    jan: 'January: add load or a harder variation. Floor push-ups once incline sets reach 12 clean reps; start a backpack on rows, squats and curls.',
+    feb: 'February: harder variations, still 1–2 reps in reserve. Decline or archer push-ups when floor sets are solid; backpack on more pulls and squats.'
+  };
   function renderHome() {
     var S = SESSIONS[st.key], plan = build(st.key, st.week);
     document.title = S.title + ' · Home Coach';
     var picker = $('picker');
     picker.innerHTML = '';
     Object.keys(SESSIONS).forEach(function (k) {
+      if (SESSIONS[k].hidden) return; // easy / rest days are reached through ?s=today (or ?s=easy / ?s=rest)
       var b = document.createElement('button');
       b.className = 'pick'; b.type = 'button';
       b.setAttribute('aria-pressed', String(k === st.key));
@@ -836,22 +949,23 @@
       b.innerHTML = '<span></span><small></small>';
       b.firstChild.textContent = SESSIONS[k].title;
       b.lastChild.textContent = fmtMin(tot);
-      b.addEventListener('click', function () {
-        if (k === st.key) return;
-        st.weekBy[st.key] = st.week; st.manualBy[st.key] = st.manual;
-        st.key = k;
-        var Sk = SESSIONS[k];
-        st.manual = !!st.manualBy[k];
-        st.week = st.weekBy[k] != null && (!Sk.levelByDone || st.manual) ? st.weekBy[k] : Sk.levelByDone ? autoLevel(k) : (st.week || 1);
-        if (st.week > maxWeek(k)) st.week = maxWeek(k);
-        setUrl(); renderHome();
-      });
+      b.addEventListener('click', function () { selectKey(k); });
       picker.appendChild(b);
     });
     $('ovTitle').textContent = S.title;
     var sk = S.streak ? streakNow(new Date(), S.streakKey) : 0;
     $('ovSub').textContent = (plan.cue || S.subtitle || '') + (sk ? ' · 🔥 ' + sk + '-day streak' : '');
     $('ovTotal').textContent = fmtMin(plan.total);
+    $('ovTotal').hidden = !!S.noPlay;
+    if (S.strength) {
+      $('ovSub').textContent = 'Estimated ' + fmtMin(plan.total) + ' · ' + S.subtitle + (sk ? ' · 🔥 ' + sk + '-day streak' : '');
+      $('ovTotal').textContent = '~' + Math.round(plan.total / 60) + ' min';
+    }
+    $('shortNote').hidden = !(S.strength && st.short);
+    var td = nairobiNow(), tk = sessionForDay(td.day), tb = $('btnToday');
+    tb.hidden = false;
+    tb.textContent = 'Today (' + DAY_NAMES[td.day].slice(0, 3) + '): ' + SESSIONS[tk].title + ' →';
+    tb.onclick = function () { st.viaToday = true; if (tk === st.key) renderHome(); else selectKey(tk); };
     $('weekRow').hidden = !S.usesWeek;
     $('ovLevel').hidden = !S.levelByDone;
     if (S.usesWeek) {
@@ -885,25 +999,45 @@
         left.appendChild(t); left.appendChild(d); li.appendChild(left);
         if (o.seconds) { var sp = document.createElement('span'); sp.className = 's'; sp.textContent = fmtMin(o.seconds); li.appendChild(sp); }
         if (o.muted) t.style.color = 'var(--muted)';
+        if (o.ladder) {
+          var lb = document.createElement('div'); lb.className = 'lad';
+          [['Easier', -1], ['Harder', 1]].forEach(function (a) {
+            var bt = document.createElement('button'); bt.type = 'button'; bt.className = 'lad-btn'; bt.textContent = a[0];
+            bt.addEventListener('click', function () { shiftLadder(o.ladder, a[1]); });
+            lb.appendChild(bt);
+          });
+          left.appendChild(lb);
+        }
       }
       list.appendChild(li);
     });
-    $('ovTip').hidden = !S.tip;
-    if (S.tip) $('ovTip').textContent = S.tip;
-    var canResume = st.started && !st.finished && st.plan && st.plan.key === st.key && st.plan.week === st.week;
+    var tipTxt = S.strength ? MONTH_NOTES[st.month || monthKeyNow()] + ' Rest 60–90 s after each set of a pair; log reps (RIR = reps you had left, optional).' : S.tip;
+    $('ovTip').hidden = !tipTxt;
+    if (tipTxt) $('ovTip').textContent = tipTxt;
+    $('btnStart').hidden = !!S.noPlay;
+    document.querySelector('.toggles').hidden = !!S.noPlay;
+    var canResume = st.started && !st.finished && st.plan && st.plan.key === st.key && st.plan.week === st.week && st.plan.short === !!st.short && st.plan.month === st.month;
     $('btnStartLabel').textContent = canResume ? 'Resume' : 'Play';
     $('btnStartOver').hidden = !canResume;
     syncToggles();
     $('homeFoot').textContent = S.foot || DEFAULT_FOOT;
     placeNotes('home');
     var last = LS.get('lastSummary', null);
-    $('lastBox').hidden = !(S.logReps && last && last.text);
-    if (S.logReps && last && last.text) {
+    var showLast = S.logReps && last && last.text && (!S.strength || last.session === st.key);
+    $('lastBox').hidden = !showLast;
+    if (showLast) {
       $('lastText').textContent = last.text;
       $('lastDate').textContent = new Date(last.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
     }
   }
 
+  function shiftLadder(exId, d) {
+    var S = SESSIONS[st.key];
+    S.pairs.forEach(function (pr) { pr.ex.forEach(function (e) {
+      if (e.id === exId) LS.set('var.' + e.id, Math.max(0, Math.min(e.ladder.length - 1, ladderIdx(e) + d)));
+    }); });
+    renderHome();
+  }
   var DEFAULT_FOOT = $('homeFoot').textContent;
 
   /* ---------- notes (on-device only: localStorage 'coach.recallNotes') ---------- */
@@ -958,11 +1092,20 @@
     var date = new Date().toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
     var lines = [S.title + (S.subtitle ? ' (' + S.subtitle.split(' · ')[0] + ')' : '') + ' · ' + date, 'Time: ' + fmt(st.realSec), ''];
     var rounds = {};
-    st.steps.forEach(function (s) {
+    if (S.strength) {
+      lines[0] = S.title + ' (' + S.subtitle.split(' · ')[0] + ') · ' + date;
+      lines[1] = 'Time: ' + fmt(st.realSec) + ' · ' + (st.month || monthKeyNow()).toUpperCase() + (st.short ? ' · short day' : '');
+      strengthRecords().forEach(function (rec) {
+        var vals = rec.vals.map(function (v) { return v === '' ? '–' : v; });
+        var l = rec.name + ': ' + rec.sets + ' sets × ' + vals.join(' / ') + (rec.unit === 's' ? ' s' : ' reps') + (rec.target ? ' (target ' + rec.target + ')' : '');
+        if (rec.rir.some(function (r) { return r !== ''; })) l += ' · RIR ' + rec.rir.map(function (r) { return r === '' ? '–' : r; }).join('/');
+        lines.push(l);
+      });
+    } else st.steps.forEach(function (s) {
       if (!s.log) return;
       (rounds[s.round] = rounds[s.round] || []).push(s);
     });
-    Object.keys(rounds).forEach(function (r) {
+    if (!S.strength) Object.keys(rounds).forEach(function (r) {
       var parts = rounds[r].map(function (s) {
         var lg = st.logs[s.logKey], v = lg && lg.value !== '' && lg.value != null ? lg.value : '–';
         return s.name + ' ' + v + (s.log === 'time' && v !== '–' ? ' s' : '');
@@ -981,13 +1124,25 @@
     if (extra.length) { lines.push(''); extra.forEach(function (e) { lines.push(e); }); }
     return lines.join('\n');
   }
+  function strengthRecords() { // [{ exKey, name, sets, unit, target, vals[], rir[] }] in session order
+    var recs = [], idx = {};
+    st.steps.forEach(function (s) {
+      if (!s.strength || !s.log) return;
+      var lg = st.logs[s.logKey] || {};
+      if (idx[s.exKey] == null) { idx[s.exKey] = recs.length; recs.push({ exKey: s.exKey, name: s.name, sets: 0, unit: s.log === 'time' ? 's' : 'reps', target: s.kind === 'reps' ? s.target : '', vals: [], rir: [] }); }
+      var r = recs[idx[s.exKey]];
+      r.sets++; r.vals.push(lg.value == null ? '' : lg.value); r.rir.push(lg.rir == null ? '' : lg.rir);
+    });
+    return recs;
+  }
   function renderDone() {
     var S = SESSIONS[st.key];
     var sr = S.streak ? st.streakRes : null;
     $('dTitle').textContent = (S.doneTitle || 'Session complete') + (sr ? (sr.added ? ' Streak +1' : ' Streak ' + sr.count + ' (already counted today)') : '');
     $('dTime').textContent = S.title + ' · ' + fmt(st.realSec) + ' total' + (sr ? ' · 🔥 ' + sr.count + '-day streak' : '');
     var lr = S.levelByDone ? st.levelRes : null, ex = $('dExtra');
-    ex.hidden = !lr;
+    ex.hidden = !lr && !(S.strength);
+    if (S.strength) ex.textContent = (st.short ? 'Short day · ' : '') + (st.bumped && st.bumped.length ? '⬆ Move up next time: ' + st.bumped.join(', ') : 'Keep the same moves next time; move up when every set hits the top of the range.');
     if (lr) {
       var line = 'Workout #' + lr.count + ' · Level ' + lr.played;
       if (lr.after > lr.before) line += ' · 🎉 Level up! Next time: Level ' + lr.after + ' (~' + Math.round(build(st.key, lr.after).total / 60) + ' min)';
@@ -1004,7 +1159,7 @@
     st.steps.forEach(function (s) { if (s.log) (byRound[s.round] = byRound[s.round] || []).push(s); });
     Object.keys(byRound).forEach(function (r) {
       var wrap = document.createElement('div'); wrap.className = 'log-round';
-      var h = document.createElement('h4'); h.textContent = 'Round ' + r; wrap.appendChild(h);
+      var h = document.createElement('h4'); h.textContent = (S.strength ? 'Set ' : 'Round ') + r; wrap.appendChild(h);
       byRound[r].forEach(function (s) {
         var row = document.createElement('label'); row.className = 'log-row';
         var name = document.createElement('span'); name.textContent = s.name;
@@ -1015,11 +1170,22 @@
         inp.value = lg && lg.value !== '' && lg.value != null ? lg.value : '';
         inp.addEventListener('input', function () {
           var v = inp.value.trim();
-          st.logs[s.logKey] = { name: s.name, round: s.round, value: v === '' ? '' : Math.max(0, parseInt(v, 10) || 0), unit: s.log === 'time' ? 's' : 'reps' };
+          var old = st.logs[s.logKey] || {};
+          st.logs[s.logKey] = { name: s.name, round: s.round, value: v === '' ? '' : Math.max(0, parseInt(v, 10) || 0), unit: s.log === 'time' ? 's' : 'reps', exKey: s.exKey, rir: old.rir == null ? '' : old.rir };
           updateSummary();
         });
         var unit = document.createElement('span'); unit.className = 'unit'; unit.textContent = s.log === 'time' ? 'sec' : 'reps';
         right.appendChild(inp); right.appendChild(unit);
+        if (S.strength && s.kind === 'reps') {
+          var ri = document.createElement('input'); ri.type = 'number'; ri.inputMode = 'numeric'; ri.min = '0'; ri.max = '9'; ri.placeholder = 'RIR'; ri.className = 'rir-in';
+          ri.setAttribute('aria-label', 'RIR for ' + s.name);
+          var l0 = st.logs[s.logKey]; ri.value = l0 && l0.rir !== '' && l0.rir != null ? l0.rir : '';
+          ri.addEventListener('input', function () {
+            var o = st.logs[s.logKey] || { name: s.name, round: s.round, value: '', unit: 'reps', exKey: s.exKey };
+            var rv = ri.value.trim(); o.rir = rv === '' ? '' : Math.min(9, Math.max(0, parseInt(rv, 10) || 0)); st.logs[s.logKey] = o; updateSummary();
+          });
+          right.appendChild(ri);
+        }
         row.appendChild(name); row.appendChild(right);
         wrap.appendChild(row);
       });
@@ -1031,6 +1197,11 @@
     var text = summaryText();
     $('dText').textContent = text;
     LS.set('lastSummary', { text: text, date: new Date().toISOString(), session: st.key });
+    if (SESSIONS[st.key].strength) { // 'last time' numbers per exercise (shown on the overview and in the player next time)
+      var ex = {};
+      strengthRecords().forEach(function (r) { if (r.vals.every(function (v) { return v === ''; })) return; ex[r.exKey] = { name: r.name, vals: r.vals, rir: r.rir, unit: r.unit }; });
+      LS.set('last.' + st.key, { date: new Date().toISOString(), month: st.month, ex: ex });
+    }
   }
   function copyText(text, msgEl, okMsg) {
     okMsg = okMsg || 'Copied! Paste it to your coach.';
@@ -1135,6 +1306,13 @@
 
   /* ---------- init ---------- */
   var sParam = qs.get('s');
+  st.month = /^(dec|jan|feb)$/.test(qs.get('m') || '') ? qs.get('m') : monthKeyNow();
+  st.short = qs.get('short') === '1'; // hidden: the coach links to ?s=upper&short=1 on short days (no toggle in the UI)
+  if (sParam === 'today') { // weekday in Africa/Nairobi; ?day=mon|tue|... overrides (testing / planning ahead)
+    var dParam = (qs.get('day') || '').toLowerCase().slice(0, 3);
+    sParam = sessionForDay(DAYS.indexOf(dParam) >= 0 ? dParam : nairobiNow().day);
+    st.viaToday = true;
+  }
   st.key = SESSIONS[sParam] ? sParam : Object.keys(SESSIONS)[0];
   st.weekBy = {}; st.manualBy = {};
   var wParam = parseInt(qs.get('level'), 10) || parseInt(qs.get('w'), 10) || 0; // ?level= or ?w= overrides the automatic level
@@ -1145,5 +1323,5 @@
   showScreen('home');
 
   // debug/test hook
-  window.__coach = { st: st, build: build, speed: SPEED, summary: summaryText, recallContext: recallContext, streakBump: streakBump, streakNow: streakNow, autoLevel: autoLevel, doneCount: doneCount, notesText: notesText, voiceOn: voiceOn };
+  window.__coach = { st: st, nairobiNow: nairobiNow, monthKeyNow: monthKeyNow, sessionForDay: sessionForDay, strengthRecords: strengthRecords, build: build, speed: SPEED, summary: summaryText, recallContext: recallContext, streakBump: streakBump, streakNow: streakNow, autoLevel: autoLevel, doneCount: doneCount, notesText: notesText, voiceOn: voiceOn };
 })();
